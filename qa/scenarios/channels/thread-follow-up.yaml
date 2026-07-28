@@ -31,6 +31,7 @@ scenario:
         "slack:adapter": 4,
       }
     kind: flow
+    channels: [qa-channel, slack, matrix]
     summary: Send a deterministic follow-up through the shared host and require native thread relation evidence.
     config:
       rootMarker: QA-THREAD-ROOT-OK
