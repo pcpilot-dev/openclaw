@@ -26,3 +26,5 @@
 {"type":"status_update","timestamp":"2026-07-28T08:14:51.143707Z","issue_id":"openclaw-ffb.3","payload":{"status":"in_progress"}}
 {"type":"close","timestamp":"2026-07-28T08:14:51.171345Z","issue_id":"openclaw-ffb.3","payload":{}}
 {"type":"status_update","timestamp":"2026-07-28T08:14:51.19838Z","issue_id":"openclaw-ffb.4","payload":{"status":"in_progress"}}
+{"type":"close","timestamp":"2026-07-28T08:19:48.842066Z","issue_id":"openclaw-ffb.4","payload":{}}
+{"type":"close","timestamp":"2026-07-28T08:19:48.86707Z","issue_id":"openclaw-ffb","payload":{}}
