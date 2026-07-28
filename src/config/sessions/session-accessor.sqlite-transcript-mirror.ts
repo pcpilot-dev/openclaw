@@ -15,7 +15,7 @@ import { readMessageIdempotencyKey } from "./session-accessor.sqlite-transcript-
 // Keep supplied-key probes below SQLite's conservative variable ceiling.
 const TRANSCRIPT_MIRROR_KEY_QUERY_BATCH_SIZE = 900;
 
-export type TranscriptMirrorFacts = {
+type TranscriptMirrorFacts = {
   existingIdempotencyKeys: Set<string>;
   messagesByIdempotencyKey: Map<string, unknown>;
 };
