@@ -64,9 +64,6 @@ import {
   snapshotNativeHookRelayPayload,
 } from "./native-hook-relay-utils.js";
 
-export { invokeNativeHookRelayBridge } from "./native-hook-relay-bridge.js";
-export { isNativeHookRelayBridgeStaleRegistrationError } from "./native-hook-relay-bridge.js";
-export { renderNativeHookRelayUnavailableResponse } from "./native-hook-relay-client.js";
 export { buildNativeHookRelayCommand } from "./native-hook-relay-command.js";
 export { resolveNativeHookRelayDeferredToolApproval } from "./native-hook-relay-permissions.js";
 export type {

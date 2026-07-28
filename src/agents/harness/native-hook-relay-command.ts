@@ -9,8 +9,6 @@ import {
   shellQuoteArgs,
 } from "./native-hook-relay-utils.js";
 
-export { DEFAULT_RELAY_TIMEOUT_MS } from "./native-hook-relay-constants.js";
-
 function resolveNativeHookRelayNicePrefix(value: number | false | undefined): string[] {
   if (process.platform === "win32" || value === false || value === undefined) {
     return [];
