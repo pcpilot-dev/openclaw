@@ -2087,6 +2087,14 @@ export const nl: TranslationMap = {
     sessionRestarted:
       "{error} OpenClaw is een nieuwe sessie gestart; eerdere berichten blijven bewaard als context.",
     unsupportedGateway: "Werk de Gateway bij om de setup met OpenClaw voort te zetten.",
+    panel: {
+      title: "OpenClaw",
+      toggle: "Vraag OpenClaw",
+      close: "Ask OpenClaw sluiten",
+      resize: "Grootte van Ask OpenClaw aanpassen",
+      dockBottom: "Ask OpenClaw onderaan verankeren",
+      dockRight: "Ask OpenClaw rechts verankeren",
+    },
     history: {
       button: "Geschiedenis",
       title: "Recente wijzigingen",
@@ -4808,6 +4816,8 @@ export const nl: TranslationMap = {
     ru: "Русский (Russisch)",
   },
   cron: {
+    adminRequired:
+      "Alleen bladeren. Voor automatiseringswijzigingen is operator.admin-toegang vereist.",
     tabs: {
       filterLabel: "Automatiseringsstatus",
       all: "Alle",

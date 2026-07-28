@@ -2090,6 +2090,14 @@ export const uk: TranslationMap = {
     sessionRestarted:
       "{error} OpenClaw розпочав новий сеанс; попередні повідомлення залишаються для контексту.",
     unsupportedGateway: "Оновіть Gateway, щоб продовжити налаштування з OpenClaw.",
+    panel: {
+      title: "OpenClaw",
+      toggle: "Запитати OpenClaw",
+      close: "Закрити «Запитати OpenClaw»",
+      resize: "Змінити розмір «Запитати OpenClaw»",
+      dockBottom: "Закріпити «Запитати OpenClaw» знизу",
+      dockRight: "Закріпити «Запитати OpenClaw» праворуч",
+    },
     history: {
       button: "Історія",
       title: "Останні зміни",
@@ -4795,6 +4803,7 @@ export const uk: TranslationMap = {
     ru: "Русский (російська)",
   },
   cron: {
+    adminRequired: "Лише перегляд. Зміни автоматизації потребують доступу operator.admin.",
     tabs: {
       filterLabel: "Стан автоматизації",
       all: "Усі",

@@ -2054,6 +2054,14 @@ export const hi: TranslationMap = {
     connectionChanged: "Gateway कनेक्शन बदल गया। इस सेटअप को जारी रखने के लिए पुनः प्रयास करें।",
     sessionRestarted: "{error} OpenClaw ने एक नया सत्र शुरू किया; संदर्भ के लिए पहले के संदेश बने रहते हैं।",
     unsupportedGateway: "OpenClaw के साथ सेटअप जारी रखने के लिए Gateway को अपडेट करें।",
+    panel: {
+      title: "OpenClaw",
+      toggle: "OpenClaw से पूछें",
+      close: "Ask OpenClaw बंद करें",
+      resize: "Ask OpenClaw का आकार बदलें",
+      dockBottom: "Ask OpenClaw को नीचे डॉक करें",
+      dockRight: "Ask OpenClaw को दाईं ओर डॉक करें",
+    },
     history: {
       button: "इतिहास",
       title: "हाल के बदलाव",
@@ -4718,6 +4726,7 @@ export const hi: TranslationMap = {
     ru: "Русский (Russian)",
   },
   cron: {
+    adminRequired: "केवल ब्राउज़िंग। ऑटोमेशन में बदलाव के लिए operator.admin एक्सेस आवश्यक है।",
     tabs: {
       filterLabel: "ऑटोमेशन की स्थिति",
       all: "सभी",

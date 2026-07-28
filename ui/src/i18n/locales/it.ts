@@ -2099,6 +2099,14 @@ export const it: TranslationMap = {
     sessionRestarted:
       "{error} OpenClaw ha avviato una nuova sessione; i messaggi precedenti restano disponibili come contesto.",
     unsupportedGateway: "Aggiorna il Gateway per continuare la configurazione con OpenClaw.",
+    panel: {
+      title: "OpenClaw",
+      toggle: "Chiedi a OpenClaw",
+      close: "Chiudi Ask OpenClaw",
+      resize: "Ridimensiona Ask OpenClaw",
+      dockBottom: "Aggancia Ask OpenClaw in basso",
+      dockRight: "Aggancia Ask OpenClaw a destra",
+    },
     history: {
       button: "Cronologia",
       title: "Modifiche recenti",
@@ -4839,6 +4847,8 @@ export const it: TranslationMap = {
     ru: "Русский (Russian)",
   },
   cron: {
+    adminRequired:
+      "Sola consultazione. Le modifiche all'automazione richiedono l'accesso operator.admin.",
     tabs: {
       filterLabel: "Stato dell'automazione",
       all: "Tutti",

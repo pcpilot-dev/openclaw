@@ -2062,6 +2062,14 @@ export const ko: TranslationMap = {
     sessionRestarted:
       "{error} OpenClaw가 새 세션을 시작했습니다. 이전 메시지는 컨텍스트로 유지됩니다.",
     unsupportedGateway: "OpenClaw로 설정을 계속하려면 Gateway를 업데이트하세요.",
+    panel: {
+      title: "OpenClaw",
+      toggle: "OpenClaw에게 물어보기",
+      close: "Ask OpenClaw 닫기",
+      resize: "Ask OpenClaw 크기 조정",
+      dockBottom: "Ask OpenClaw를 하단에 도킹",
+      dockRight: "Ask OpenClaw를 오른쪽에 도킹",
+    },
     history: {
       button: "기록",
       title: "최근 변경 사항",
@@ -4748,6 +4756,8 @@ export const ko: TranslationMap = {
     ru: "Русский (Russian)",
   },
   cron: {
+    adminRequired:
+      "탐색만 가능합니다. 자동화를 변경하려면 operator.admin 액세스 권한이 필요합니다.",
     tabs: {
       filterLabel: "자동화 상태",
       all: "전체",

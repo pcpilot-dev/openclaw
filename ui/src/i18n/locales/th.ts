@@ -2039,6 +2039,14 @@ export const th: TranslationMap = {
     connectionChanged: "การเชื่อมต่อ Gateway มีการเปลี่ยนแปลง ลองใหม่เพื่อดำเนินการตั้งค่านี้ต่อ",
     sessionRestarted: "{error} OpenClaw เริ่มเซสชันใหม่ ข้อความก่อนหน้ายังคงอยู่เพื่อใช้เป็นบริบท",
     unsupportedGateway: "อัปเดต Gateway เพื่อดำเนินการตั้งค่าต่อกับ OpenClaw",
+    panel: {
+      title: "OpenClaw",
+      toggle: "ถาม OpenClaw",
+      close: "ปิด Ask OpenClaw",
+      resize: "ปรับขนาด Ask OpenClaw",
+      dockBottom: "จอด Ask OpenClaw ไว้ด้านล่าง",
+      dockRight: "จอด Ask OpenClaw ไว้ด้านขวา",
+    },
     history: {
       button: "ประวัติ",
       title: "การเปลี่ยนแปลงล่าสุด",
@@ -4682,6 +4690,7 @@ export const th: TranslationMap = {
     ru: "Русский (รัสเซีย)",
   },
   cron: {
+    adminRequired: "เรียกดูเท่านั้น การเปลี่ยนแปลงการทำงานอัตโนมัติต้องมีสิทธิ์ operator.admin",
     tabs: {
       filterLabel: "สถานะระบบอัตโนมัติ",
       all: "ทั้งหมด",

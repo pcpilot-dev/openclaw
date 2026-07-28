@@ -2077,6 +2077,14 @@ export const tr: TranslationMap = {
     sessionRestarted:
       "{error} OpenClaw yeni bir oturum başlattı; önceki mesajlar bağlam için korunuyor.",
     unsupportedGateway: "OpenClaw ile kuruluma devam etmek için Gateway'i güncelleyin.",
+    panel: {
+      title: "OpenClaw",
+      toggle: "OpenClaw'a Sor",
+      close: "Ask OpenClaw'ı Kapat",
+      resize: "Ask OpenClaw'ı Yeniden Boyutlandır",
+      dockBottom: "Ask OpenClaw'ı alta sabitle",
+      dockRight: "Ask OpenClaw'ı sağa sabitle",
+    },
     history: {
       button: "Geçmiş",
       title: "Son değişiklikler",
@@ -4798,6 +4806,7 @@ export const tr: TranslationMap = {
     ru: "Русский (Rusça)",
   },
   cron: {
+    adminRequired: "Yalnızca göz atma. Otomasyon değişiklikleri operator.admin erişimi gerektirir.",
     tabs: {
       filterLabel: "Otomasyon durumu",
       all: "Tümü",

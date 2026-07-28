@@ -2079,6 +2079,14 @@ export const vi: TranslationMap = {
     sessionRestarted:
       "{error} OpenClaw đã bắt đầu một phiên mới; các tin nhắn trước đó vẫn được giữ lại làm ngữ cảnh.",
     unsupportedGateway: "Cập nhật Gateway để tiếp tục thiết lập với OpenClaw.",
+    panel: {
+      title: "OpenClaw",
+      toggle: "Hỏi OpenClaw",
+      close: "Đóng Ask OpenClaw",
+      resize: "Thay đổi kích thước Ask OpenClaw",
+      dockBottom: "Neo Ask OpenClaw ở dưới cùng",
+      dockRight: "Neo Ask OpenClaw ở bên phải",
+    },
     history: {
       button: "Lịch sử",
       title: "Thay đổi gần đây",
@@ -4774,6 +4782,7 @@ export const vi: TranslationMap = {
     ru: "Русский (Tiếng Nga)",
   },
   cron: {
+    adminRequired: "Chỉ duyệt xem. Thay đổi tự động hóa yêu cầu quyền truy cập operator.admin.",
     tabs: {
       filterLabel: "Trạng thái tự động hóa",
       all: "Tất cả",

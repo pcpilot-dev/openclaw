@@ -2054,6 +2054,14 @@ export const ar: TranslationMap = {
     connectionChanged: "تغيّر اتصال Gateway. أعد المحاولة لمتابعة هذا الإعداد.",
     sessionRestarted: "{error} بدأ OpenClaw جلسة جديدة؛ تبقى الرسائل السابقة للسياق.",
     unsupportedGateway: "قم بتحديث Gateway لمتابعة الإعداد مع OpenClaw.",
+    panel: {
+      title: "OpenClaw",
+      toggle: "اسأل OpenClaw",
+      close: "إغلاق Ask OpenClaw",
+      resize: "تغيير حجم Ask OpenClaw",
+      dockBottom: "إرساء Ask OpenClaw في الأسفل",
+      dockRight: "إرساء Ask OpenClaw على اليمين",
+    },
     history: {
       button: "السجل",
       title: "التغييرات الأخيرة",
@@ -4723,6 +4731,7 @@ export const ar: TranslationMap = {
     ru: "الروسية (Russian)",
   },
   cron: {
+    adminRequired: "التصفح فقط. تتطلب تغييرات الأتمتة صلاحية operator.admin.",
     tabs: {
       filterLabel: "حالة الأتمتة",
       all: "الكل",

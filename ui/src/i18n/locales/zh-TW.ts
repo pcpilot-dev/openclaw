@@ -2025,6 +2025,14 @@ export const zh_TW: TranslationMap = {
     connectionChanged: "Gateway 連線已變更。請重試以繼續此設定。",
     sessionRestarted: "{error} OpenClaw 已開啟新的工作階段；先前的訊息會保留以供參考。",
     unsupportedGateway: "請更新 Gateway 以繼續使用 OpenClaw 進行設定。",
+    panel: {
+      title: "OpenClaw",
+      toggle: "詢問 OpenClaw",
+      close: "關閉 Ask OpenClaw",
+      resize: "調整 Ask OpenClaw 大小",
+      dockBottom: "將 Ask OpenClaw 停靠於底部",
+      dockRight: "將 Ask OpenClaw 停靠於右側",
+    },
     history: {
       button: "歷史記錄",
       title: "近期變更",
@@ -4654,6 +4662,7 @@ export const zh_TW: TranslationMap = {
     ru: "Русский (Russian)",
   },
   cron: {
+    adminRequired: "僅供瀏覽。變更自動化需要 operator.admin 存取權限。",
     tabs: {
       filterLabel: "自動化狀態",
       all: "全部",

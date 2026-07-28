@@ -2073,6 +2073,14 @@ export const id: TranslationMap = {
     sessionRestarted:
       "{error} OpenClaw memulai sesi baru; pesan sebelumnya tetap ada sebagai konteks.",
     unsupportedGateway: "Perbarui Gateway untuk melanjutkan pengaturan dengan OpenClaw.",
+    panel: {
+      title: "OpenClaw",
+      toggle: "Tanya OpenClaw",
+      close: "Tutup Ask OpenClaw",
+      resize: "Ubah ukuran Ask OpenClaw",
+      dockBottom: "Tempatkan Ask OpenClaw di bagian bawah",
+      dockRight: "Tempatkan Ask OpenClaw di bagian kanan",
+    },
     history: {
       button: "Riwayat",
       title: "Perubahan terbaru",
@@ -4774,6 +4782,7 @@ export const id: TranslationMap = {
     ru: "Русский (Russian)",
   },
   cron: {
+    adminRequired: "Hanya menjelajah. Perubahan otomatisasi memerlukan akses operator.admin.",
     tabs: {
       filterLabel: "Status otomatisasi",
       all: "Semua",

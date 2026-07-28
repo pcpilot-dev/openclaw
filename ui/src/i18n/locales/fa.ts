@@ -2071,6 +2071,14 @@ export const fa: TranslationMap = {
     sessionRestarted:
       "{error} OpenClaw یک نشست جدید آغاز کرد؛ پیام‌های قبلی برای زمینه باقی می‌مانند.",
     unsupportedGateway: "برای ادامه راه‌اندازی با OpenClaw، Gateway را به‌روزرسانی کنید.",
+    panel: {
+      title: "OpenClaw",
+      toggle: "از OpenClaw بپرسید",
+      close: "بستن Ask OpenClaw",
+      resize: "تغییر اندازه Ask OpenClaw",
+      dockBottom: "اتصال Ask OpenClaw به پایین",
+      dockRight: "اتصال Ask OpenClaw به راست",
+    },
     history: {
       button: "تاریخچه",
       title: "تغییرات اخیر",
@@ -4764,6 +4772,7 @@ export const fa: TranslationMap = {
     ru: "Русский (روسی)",
   },
   cron: {
+    adminRequired: "فقط مرور. تغییرات خودکارسازی نیازمند دسترسی operator.admin است.",
     tabs: {
       filterLabel: "وضعیت خودکارسازی",
       all: "همه",

@@ -2087,6 +2087,14 @@ export const ja_JP: TranslationMap = {
     sessionRestarted:
       "{error} OpenClaw は新しいセッションを開始しました。以前のメッセージはコンテキストとして残ります。",
     unsupportedGateway: "OpenClaw でセットアップを続けるには Gateway を更新してください。",
+    panel: {
+      title: "OpenClaw",
+      toggle: "OpenClaw に質問",
+      close: "Ask OpenClaw を閉じる",
+      resize: "Ask OpenClaw のサイズを変更",
+      dockBottom: "Ask OpenClaw を下部にドッキング",
+      dockRight: "Ask OpenClaw を右側にドッキング",
+    },
     history: {
       button: "履歴",
       title: "最近の変更",
@@ -4800,6 +4808,7 @@ export const ja_JP: TranslationMap = {
     ru: "Русский (ロシア語)",
   },
   cron: {
+    adminRequired: "閲覧のみ可能です。自動化の変更には operator.admin アクセス権が必要です。",
     tabs: {
       filterLabel: "自動化ステータス",
       all: "すべて",
