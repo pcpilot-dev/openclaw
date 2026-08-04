@@ -170,8 +170,20 @@ function createFakeClient(): FakeClient {
     },
   };
   client.request.mockImplementation(async (method: string) => {
+    if (method === "config/read") {
+      return {
+        config: { mcp_servers: { inherited: { command: "unsafe" } } },
+        layers: [{ name: { type: "user" } }],
+      };
+    }
+    if (method === "configRequirements/read") {
+      return { requirements: null };
+    }
     if (method === "thread/fork") {
       return threadResult("side-thread");
+    }
+    if (method === "mcpServerStatus/list") {
+      return { data: [], nextCursor: null };
     }
     if (method === "thread/inject_items") {
       return {};
@@ -1143,7 +1155,44 @@ describe("runCodexAppServerSideQuestion", () => {
   it.each([
     { name: "deny all", toolsAllow: [] },
     { name: "narrow allowlist", toolsAllow: ["message"] },
-  ])("rejects /btw before forking when effective toolsAllow is $name", async ({ toolsAllow }) => {
+    {
+      name: "sandboxed deny all",
+      toolsAllow: [],
+      cfg: { agents: { defaults: { sandbox: { mode: "all" } } } },
+    },
+    {
+      name: "node-hosted narrow allowlist",
+      toolsAllow: ["message"],
+      cfg: { tools: { exec: { host: "node", node: "worker-1" } } },
+    },
+  ])("runs /btw without tools when effective toolsAllow is $name", async ({ toolsAllow, cfg }) => {
+    const client = createFakeClient();
+    const baseRequest = client.request.getMockImplementation();
+    let toolResponse: unknown;
+    client.request.mockImplementation(async (method, requestParams, requestOptions) => {
+      if (method === "turn/start") {
+        setTimeout(() => {
+          void (async () => {
+            toolResponse = await client.handleRequest({
+              id: 42,
+              method: "item/tool/call",
+              params: {
+                threadId: "side-thread",
+                turnId: "turn-1",
+                callId: "tool-1",
+                tool: "wiki_status",
+                arguments: {},
+              },
+            });
+            client.emit(turnCompleted("side-thread", "turn-1", "Tool-less answer."));
+          })();
+        }, 0);
+        return turnStartResult("turn-1");
+      }
+      return await baseRequest?.(method, requestParams, requestOptions);
+    });
+    getSharedCodexAppServerClientMock.mockResolvedValue(client);
+
     await expect(
       runCodexAppServerSideQuestion(
         sideParams({
@@ -1151,13 +1200,36 @@ describe("runCodexAppServerSideQuestion", () => {
           messageProvider: "telegram",
           senderId: "restricted-sender",
           toolsAllow,
+          ...(cfg ? { cfg: cfg as never } : {}),
         }),
       ),
-    ).rejects.toThrow(
-      "Codex-native /btw side-question mode is unavailable because the effective tool policy restricts Codex native tools for this session.",
-    );
+    ).resolves.toEqual({ text: "Tool-less answer." });
 
-    expect(getSharedCodexAppServerClientMock).not.toHaveBeenCalled();
+    const forkParams = client.request.mock.calls.find(
+      ([method]) => method === "thread/fork",
+    )?.[1] as { config?: Record<string, unknown> } | undefined;
+    expect(forkParams?.config).toMatchObject({
+      "agents.enabled": false,
+      "features.apps": false,
+      "features.code_mode": false,
+      "features.code_mode_only": false,
+      "features.multi_agent": false,
+      "features.plugins": false,
+      "features.standalone_web_search": false,
+      "tools.experimental_request_user_input.enabled": false,
+      "tools.update_plan.enabled": false,
+      mcp_servers: { inherited: { enabled: false } },
+      web_search: "disabled",
+    });
+    expect(forkParams?.config).not.toHaveProperty("features.apply_patch_streaming_events");
+    const turnParams = client.request.mock.calls.find(([method]) => method === "turn/start")?.[1];
+    expect(turnParams).toMatchObject({ environments: [] });
+    expect(turnParams).not.toHaveProperty("cwd");
+    expect(toolResponse).toEqual({
+      success: false,
+      contentItems: [{ type: "inputText", text: "Unknown OpenClaw tool: wiki_status" }],
+    });
+    expect(createOpenClawCodingToolsMock).not.toHaveBeenCalled();
     expect(resolveCodexProviderWebSearchSupportForClientMock).not.toHaveBeenCalled();
   });
 

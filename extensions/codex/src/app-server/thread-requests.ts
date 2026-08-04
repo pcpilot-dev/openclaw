@@ -440,7 +440,8 @@ export function buildCodexRingZeroThreadConfigPatch(
   return buildCodexRestrictedToolThreadConfigPatch(inheritedMcpServerNames);
 }
 
-function buildCodexRestrictedToolThreadConfigPatch(
+/** Disables every configurable Codex-owned tool source for a ring-zero thread. */
+export function buildCodexRestrictedToolThreadConfigPatch(
   inheritedMcpServerNames: readonly string[],
 ): JsonObject {
   // Narrow OpenClaw allowlists already send environments: [] and disable

@@ -116,6 +116,12 @@ import {
   resolveCodexBindingModelProviderFallback,
   resolveReasoningEffort,
 } from "./thread-lifecycle.js";
+import {
+  assertCodexRingZeroHasNoManagedHooks,
+  attestCodexRingZeroThreadHasNoMcpServers,
+  buildCodexRestrictedToolThreadConfigPatch,
+  readCodexInheritedMcpServerNames,
+} from "./thread-requests.js";
 import { filterToolsForVisionInputs } from "./vision-tools.js";
 import {
   resolveCodexWebSearchPlan,
@@ -281,20 +287,19 @@ export async function runCodexAppServerSideQuestion(
       }
     : params;
   const sideRunParams = buildSideRunAttemptParams(effectiveParams, { cwd, authProfileId, runId });
-  const nativeExecutionBlock = resolveCodexNativeExecutionBlock({
-    config: sideRunParams.config,
-    sessionKey: sideRunParams.sandboxSessionKey?.trim() || sideRunParams.sessionKey,
-    sessionId: sideRunParams.sessionId,
-    surface: "/btw side-question mode",
-  });
-  if (nativeExecutionBlock) {
-    throw new Error(nativeExecutionBlock);
-  }
   const nativeToolSurfaceEnabled = shouldEnableCodexAppServerNativeToolSurface(sideRunParams);
-  if (!nativeToolSurfaceEnabled) {
-    throw new Error(
-      "Codex-native /btw side-question mode is unavailable because the effective tool policy restricts Codex native tools for this session.",
-    );
+  // Narrow allowlists enter the attested ring-zero path below. The native
+  // execution guard applies only when this side thread will expose native tools.
+  if (nativeToolSurfaceEnabled) {
+    const nativeExecutionBlock = resolveCodexNativeExecutionBlock({
+      config: sideRunParams.config,
+      sessionKey: sideRunParams.sandboxSessionKey?.trim() || sideRunParams.sessionKey,
+      sessionId: sideRunParams.sessionId,
+      surface: "/btw side-question mode",
+    });
+    if (nativeExecutionBlock) {
+      throw new Error(nativeExecutionBlock);
+    }
   }
   const clientOptions = {
     startOptions: appServer.start,
@@ -400,6 +405,12 @@ export async function runCodexAppServerSideQuestion(
     const sandbox = useModelScopedPolicy
       ? modelScopedAppServer.sandbox
       : (binding.sandbox ?? modelScopedAppServer.sandbox);
+    const inheritedMcpServerNames = nativeToolSurfaceEnabled
+      ? []
+      : await readCodexInheritedMcpServerNames(client, cwd, runAbortController.signal);
+    if (!nativeToolSurfaceEnabled) {
+      await assertCodexRingZeroHasNoManagedHooks(client, runAbortController.signal);
+    }
     const nativeProviderWebSearchSupport =
       resolveCodexWebSearchPlan({
         config: params.cfg,
@@ -548,42 +559,43 @@ export async function runCodexAppServerSideQuestion(
       configuredEvents: options.nativeHookRelay?.events,
       approvalPolicy,
     });
-    nativeHookRelay = options.nativeHookRelay
-      ? registerCodexSideNativeHookRelay({
-          options: options.nativeHookRelay,
-          events: nativeHookRelayEvents,
-          agentId: sessionAgentId,
-          sessionId: params.sessionId,
-          sessionKey: params.sessionKey,
-          config: params.cfg,
-          runId: sideRunParams.runId,
-          channelId: buildAgentHookContextChannelFields({
+    nativeHookRelay =
+      nativeToolSurfaceEnabled && options.nativeHookRelay
+        ? registerCodexSideNativeHookRelay({
+            options: options.nativeHookRelay,
+            events: nativeHookRelayEvents,
+            agentId: sessionAgentId,
+            sessionId: params.sessionId,
             sessionKey: params.sessionKey,
-            messageChannel: params.messageChannel,
-            messageProvider: params.messageProvider,
-            currentChannelId: params.currentChannelId,
-          }).channelId,
-          requestTimeoutMs: appServer.requestTimeoutMs,
-          completionTimeoutMs: Math.max(
-            appServer.turnCompletionIdleTimeoutMs,
-            SIDE_QUESTION_COMPLETION_TIMEOUT_MS,
-          ),
-          loopDetectionPreToolUseRelay: appServer.loopDetectionPreToolUseRelay,
-          signal: runAbortController.signal,
-          onPreToolUseFailure: (failure) => {
-            if (nativePreToolUseFailureFallbackActive) {
-              emitNativePreToolUseFailure(failure);
-            } else if (nativeToolLifecycleProjector) {
-              nativeToolLifecycleProjector.recordPreToolUseFailure(
-                failure,
-                nativeToolRunWasAbortedBeforeCleanup,
-              );
-            } else {
-              pendingNativePreToolUseFailures.push(failure);
-            }
-          },
-        })
-      : undefined;
+            config: params.cfg,
+            runId: sideRunParams.runId,
+            channelId: buildAgentHookContextChannelFields({
+              sessionKey: params.sessionKey,
+              messageChannel: params.messageChannel,
+              messageProvider: params.messageProvider,
+              currentChannelId: params.currentChannelId,
+            }).channelId,
+            requestTimeoutMs: appServer.requestTimeoutMs,
+            completionTimeoutMs: Math.max(
+              appServer.turnCompletionIdleTimeoutMs,
+              SIDE_QUESTION_COMPLETION_TIMEOUT_MS,
+            ),
+            loopDetectionPreToolUseRelay: appServer.loopDetectionPreToolUseRelay,
+            signal: runAbortController.signal,
+            onPreToolUseFailure: (failure) => {
+              if (nativePreToolUseFailureFallbackActive) {
+                emitNativePreToolUseFailure(failure);
+              } else if (nativeToolLifecycleProjector) {
+                nativeToolLifecycleProjector.recordPreToolUseFailure(
+                  failure,
+                  nativeToolRunWasAbortedBeforeCleanup,
+                );
+              } else {
+                pendingNativePreToolUseFailures.push(failure);
+              }
+            },
+          })
+        : undefined;
     const nativeHookRelayConfig = nativeHookRelay
       ? buildCodexNativeHookRelayConfig({
           relay: nativeHookRelay,
@@ -604,12 +616,16 @@ export async function runCodexAppServerSideQuestion(
     const pluginAppsConfigPatch = binding.pluginAppPolicyContext
       ? buildCodexPluginAppsConfigPatchFromPolicyContext(binding.pluginAppPolicyContext)
       : undefined;
+    const restrictedToolConfig = nativeToolSurfaceEnabled
+      ? undefined
+      : buildCodexRestrictedToolThreadConfigPatch(inheritedMcpServerNames);
     const threadConfig =
       mergeCodexThreadConfigs(
         nativeHookRelayConfig,
         runtimeThreadConfig,
         pluginAppsConfigPatch,
         modelScopedAppServer.networkProxy?.configPatch,
+        restrictedToolConfig,
       ) ?? runtimeThreadConfig;
     const forkResponse = assertCodexThreadForkResponse(
       await withLeasedCodexAppServerClientStartSelectionRetry({
@@ -650,6 +666,13 @@ export async function runCodexAppServerSideQuestion(
         "Codex supervised side thread did not preserve its native model and provider",
       );
     }
+    if (!nativeToolSurfaceEnabled) {
+      await attestCodexRingZeroThreadHasNoMcpServers(
+        client,
+        childThreadId,
+        runAbortController.signal,
+      );
+    }
 
     await client.request(
       "thread/inject_items",
@@ -667,6 +690,8 @@ export async function runCodexAppServerSideQuestion(
           modelSelection.model,
           readCodexSupportedReasoningEfforts(params.runtimeModel?.compat),
         );
+    // Forks start with a default local environment. An explicit empty turn
+    // environment is the Codex contract that removes shell/file access.
     const turnResponse = assertCodexTurnStartResponse(
       await client
         .request(
@@ -674,7 +699,7 @@ export async function runCodexAppServerSideQuestion(
           {
             threadId: childThreadId,
             input: [{ type: "text", text: params.question.trim(), text_elements: [] }],
-            cwd,
+            ...(nativeToolSurfaceEnabled ? { cwd } : { environments: [] }),
             model: modelSelection.model,
             ...(usesSupervisionConnection ? {} : { personality: CODEX_NATIVE_PERSONALITY_NONE }),
             ...(serviceTier ? { serviceTier } : {}),
@@ -934,7 +959,7 @@ async function createCodexSideToolBridge(input: {
     ({ id: input.params.model, provider: input.params.provider } as never);
   const messageToolProvider = resolveCodexMessageToolProvider(input.params);
   let tools: AnyAgentTool[] = [];
-  if (supportsModelTools(runtimeModel)) {
+  if (input.nativeToolSurfaceEnabled && supportsModelTools(runtimeModel)) {
     const createOpenClawCodingTools = (await import("openclaw/plugin-sdk/agent-harness"))
       .createOpenClawCodingTools;
     const sandboxSessionKey =
