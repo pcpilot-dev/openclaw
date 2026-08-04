@@ -1,5 +1,4 @@
 // Config-keyed chat.startup projections shared across session switches.
-import { modelCatalogBrowseRequiresFullDiscovery } from "../../agents/model-catalog-browse.js";
 import type { ModelCatalogEntry } from "../../agents/model-catalog.types.js";
 import { resolveSwarmConfig } from "../../agents/swarm-config.js";
 import { hashRuntimeConfigValue } from "../../config/runtime-snapshot.js";
@@ -107,15 +106,6 @@ async function buildChatStartupMetadataResult(params: {
   if (!params.modelCatalog) {
     return undefined;
   }
-  if (
-    modelCatalogBrowseRequiresFullDiscovery({
-      cfg: params.cfg,
-      agentId: params.agentId,
-      view: "configured",
-    })
-  ) {
-    return undefined;
-  }
   try {
     const { buildModelsListResult } = await import("./models-list-result.js");
     const currentConfig = params.context.getRuntimeConfig();
@@ -135,6 +125,9 @@ async function buildChatStartupMetadataResult(params: {
         snapshot: params.modelCatalog,
       },
       preloadedOnly: true,
+      // Dashboard startup must remain responsive even when a wildcard would
+      // normally escalate a browse request to synchronous full discovery.
+      allowPartialPreloadedCatalog: true,
       ...(params.catalogProjector ? { catalogProjector: params.catalogProjector } : {}),
     });
     return {

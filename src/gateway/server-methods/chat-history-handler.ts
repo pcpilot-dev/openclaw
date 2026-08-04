@@ -106,12 +106,27 @@ async function handleChatMetadataRequest({
     );
     return;
   }
+  const preparedCatalog = context.readPreparedGatewayModelCatalogSnapshot
+    ? await context.readPreparedGatewayModelCatalogSnapshot({ agentId: requestedAgentId })
+    : undefined;
+  if (context.readPreparedGatewayModelCatalogSnapshot && !preparedCatalog) {
+    respond(
+      false,
+      undefined,
+      errorShape(ErrorCodes.UNAVAILABLE, "prepared model catalog is reloading; retry shortly", {
+        retryable: true,
+        retryAfterMs: 250,
+      }),
+    );
+    return;
+  }
   respond(
     true,
     await buildChatMetadataResult({
       cfg,
       context,
       agentId: requestedAgentId,
+      preparedCatalog,
     }),
   );
 }
@@ -120,6 +135,10 @@ async function buildChatMetadataResult(params: {
   cfg: OpenClawConfig;
   context: GatewayRequestContext;
   agentId: string;
+  preparedCatalog?: ModelCatalogSnapshot & {
+    agentId: string;
+    config: OpenClawConfig;
+  };
 }): Promise<ChatMetadataResult> {
   const [{ buildModelsListResult }, { buildCommandsListResult }] = await Promise.all([
     import("./models-list-result.js"),
@@ -130,6 +149,17 @@ async function buildChatMetadataResult(params: {
       context: params.context,
       agentId: params.agentId,
       params: { view: "configured" },
+      ...(params.preparedCatalog
+        ? {
+            preloadedCatalog: {
+              agentId: params.preparedCatalog.agentId,
+              config: params.preparedCatalog.config,
+              snapshot: params.preparedCatalog,
+            },
+            preloadedOnly: true,
+            allowPartialPreloadedCatalog: true,
+          }
+        : {}),
     }),
     Promise.resolve().then(() =>
       buildCommandsListResult({
@@ -373,17 +403,21 @@ async function handleChatHistoryRequest({
       return;
     }
   }
-  const optionalModelCatalogLoad = startOptionalServerMethodModelCatalogSnapshotLoad(context, {
-    agentId: sessionAgentId,
-  });
   const modelCatalogPromise = measureDiagnosticsTimelineSpan(
     `gateway.${method}.model_catalog`,
-    () =>
-      loadOptionalServerMethodModelCatalogSnapshot(context, method, {
+    () => {
+      if (context.readPreparedGatewayModelCatalogSnapshot) {
+        return context.readPreparedGatewayModelCatalogSnapshot({ agentId: sessionAgentId });
+      }
+      const optionalModelCatalogLoad = startOptionalServerMethodModelCatalogSnapshotLoad(context, {
+        agentId: sessionAgentId,
+      });
+      return loadOptionalServerMethodModelCatalogSnapshot(context, method, {
         logOnceKey: method,
         startedLoad: optionalModelCatalogLoad,
         timeoutMs: CHAT_OPTIONAL_MODEL_CATALOG_TIMEOUT_MS,
-      }),
+      });
+    },
     {
       config: cfg,
       phase: method,

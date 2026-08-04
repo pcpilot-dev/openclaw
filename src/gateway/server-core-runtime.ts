@@ -80,6 +80,7 @@ export async function startGatewayCoreRuntime(input: {
   loadGatewayModelCatalog: typeof import("./server-model-catalog.js").loadGatewayModelCatalog;
   loadGatewayModelCatalogSnapshot: typeof import("./server-model-catalog.js").loadGatewayModelCatalogSnapshot;
   readPreparedGatewayModelCatalog: typeof import("./server-model-catalog.js").readPreparedGatewayModelCatalog;
+  readPreparedGatewayModelCatalogSnapshot: typeof import("./server-model-catalog.js").readPreparedGatewayModelCatalogSnapshot;
 }) {
   const {
     lifecycleRuntime: runtime,
@@ -93,6 +94,7 @@ export async function startGatewayCoreRuntime(input: {
     loadGatewayModelCatalog,
     loadGatewayModelCatalogSnapshot,
     readPreparedGatewayModelCatalog,
+    readPreparedGatewayModelCatalogSnapshot,
   } = input;
   const {
     minimalTestGateway,
@@ -554,5 +556,6 @@ export async function startGatewayCoreRuntime(input: {
     loadGatewayModelCatalog,
     loadGatewayModelCatalogSnapshot,
     readPreparedGatewayModelCatalog,
+    readPreparedGatewayModelCatalogSnapshot,
   };
 }

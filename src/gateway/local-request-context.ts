@@ -3,6 +3,7 @@ import { listAgentIds, resolveDefaultAgentId } from "../agents/agent-scope.js";
 // Local embedded Gateway request context.
 // Lets local agent paths reuse Gateway server methods without starting a server.
 import {
+  getPreparedModelCatalogOwnerSnapshot,
   getPreparedModelCatalogSnapshot,
   loadResolvedPublishedModelCatalogOwner,
 } from "../agents/prepared-model-catalog.js";
@@ -137,6 +138,22 @@ function createLocalGatewayRequestContext(
         config: params.getRuntimeConfig(),
         readOnly: true,
       })?.entries,
+    readPreparedGatewayModelCatalogSnapshot: async (loadParams) => {
+      const owner = getPreparedModelCatalogOwnerSnapshot({
+        ...loadParams,
+        config: params.getRuntimeConfig(),
+        readOnly: true,
+      });
+      return owner
+        ? {
+            ...owner.modelCatalog,
+            agentId: owner.agentId,
+            agentDir: owner.agentDir,
+            workspaceDir: owner.workspaceDir,
+            config: owner.config,
+          }
+        : undefined;
+    },
     getHealthCache: () => null,
     refreshHealthSnapshot: async () =>
       ({}) as Awaited<ReturnType<GatewayRequestContext["refreshHealthSnapshot"]>>,

@@ -265,7 +265,12 @@ async function writeStoredMainSession(entry: StoredSessionEntry = {}) {
   });
 }
 
-type DirectChatMethod = "chat.abort" | "chat.history" | "chat.send" | "chat.startup";
+type DirectChatMethod =
+  | "chat.abort"
+  | "chat.history"
+  | "chat.metadata"
+  | "chat.send"
+  | "chat.startup";
 
 async function callDirectChatHandler(
   method: DirectChatMethod,
@@ -1221,6 +1226,103 @@ describe("gateway server chat", () => {
     }
   });
 
+  test("dashboard chat RPCs use a partial prepared wildcard catalog without discovery", async () => {
+    openDirectChatSession();
+    const config = {
+      agents: {
+        defaults: {
+          model: { primary: "test-provider/prepared-model" },
+          models: { "test-provider/*": {} },
+        },
+        list: [{ id: "main", default: true }],
+      },
+    } as OpenClawConfig;
+    const preparedCatalog = {
+      agentId: "main",
+      agentDir: "/tmp/chat-prepared-agent",
+      workspaceDir: "/tmp/chat-prepared-workspace",
+      config,
+      entries: [{ id: "prepared-model", name: "Prepared Model", provider: "test-provider" }],
+      routeVariants: [],
+    };
+    const loadGatewayModelCatalogSnapshot = vi.fn(async () => {
+      throw new Error("dashboard RPC started model discovery");
+    });
+    const readPreparedGatewayModelCatalogSnapshot = vi.fn(async () => preparedCatalog);
+    const context = createDirectChatContext({
+      getRuntimeConfig: () => config,
+      loadGatewayModelCatalogSnapshot,
+      readPreparedGatewayModelCatalogSnapshot,
+    });
+    try {
+      await writeStoredMainSession({
+        modelProvider: "test-provider",
+        model: "prepared-model",
+      });
+      const responses: Array<{ ok: boolean; payload?: unknown; error?: unknown }> = [];
+      const respond = ((ok, payload, error) => responses.push({ ok, payload, error })) as RespondFn;
+
+      await callDirectChat("chat.startup", {
+        id: "startup-prepared-catalog",
+        params: { sessionKey: "main" },
+        respond,
+        context,
+      });
+      await callDirectChat("chat.metadata", {
+        id: "metadata-prepared-catalog",
+        params: { agentId: "main" },
+        respond,
+        context,
+      });
+
+      expect(responses.map((response) => response.ok)).toEqual([true, true]);
+      expect(loadGatewayModelCatalogSnapshot).not.toHaveBeenCalled();
+      expect(readPreparedGatewayModelCatalogSnapshot).toHaveBeenCalledTimes(2);
+      for (const response of responses) {
+        expect(
+          (response.payload as { metadata?: { models?: unknown[] }; models?: unknown[] }).metadata
+            ?.models ?? (response.payload as { models?: unknown[] }).models,
+        ).toEqual(expect.arrayContaining([expect.objectContaining({ id: "prepared-model" })]));
+      }
+    } finally {
+      testState.sessionStorePath = undefined;
+    }
+  });
+
+  test("chat.metadata reports a retryable reload instead of caching an empty catalog", async () => {
+    const config = {
+      agents: { defaults: {}, list: [{ id: "main", default: true }] },
+    } as OpenClawConfig;
+    const loadGatewayModelCatalogSnapshot = vi.fn(async () => {
+      throw new Error("metadata fallback started model discovery");
+    });
+    const context = createDirectChatContext({
+      getRuntimeConfig: () => config,
+      loadGatewayModelCatalogSnapshot,
+      readPreparedGatewayModelCatalogSnapshot: vi.fn(async () => undefined),
+    });
+    const responses: Array<{ ok: boolean; payload?: unknown; error?: unknown }> = [];
+
+    await callDirectChat("chat.metadata", {
+      id: "metadata-catalog-reloading",
+      params: { agentId: "main" },
+      respond: ((ok, payload, error) => responses.push({ ok, payload, error })) as RespondFn,
+      context,
+    });
+
+    expect(loadGatewayModelCatalogSnapshot).not.toHaveBeenCalled();
+    expect(responses).toEqual([
+      expect.objectContaining({
+        ok: false,
+        error: expect.objectContaining({
+          code: "UNAVAILABLE",
+          retryable: true,
+          retryAfterMs: 250,
+        }),
+      }),
+    ]);
+  });
+
   test("chat.startup projects route thinking metadata per agent and session auth", async () => {
     await withOpenClawTestState(
       {
@@ -1487,7 +1589,7 @@ describe("gateway server chat", () => {
     );
   });
 
-  test("chat.startup omits metadata when configured model visibility needs full discovery", async () => {
+  test("chat.startup returns prepared metadata when visibility would require full discovery", async () => {
     await withGatewayChatHarness(async ({ ws }) => {
       await writeGatewayConfig({
         agents: {
@@ -1510,12 +1612,16 @@ describe("gateway server chat", () => {
       });
       await connectOk(ws);
 
-      const startup = await rpcReq<{ metadata?: unknown }>(ws, "chat.startup", {
+      const startup = await rpcReq<{
+        metadata?: { models?: Array<{ id?: string; provider?: string }> };
+      }>(ws, "chat.startup", {
         sessionKey: "main",
       });
 
       expect(startup.ok).toBe(true);
-      expect(startup.payload?.metadata).toBeUndefined();
+      expect(startup.payload?.metadata?.models).toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: "gpt-main", provider: "openai" })]),
+      );
     });
   });
 

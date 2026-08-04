@@ -58,6 +58,7 @@ vi.mock("./prepared-model-runtime.scoped-catalog.js", () => ({
 
 import { PreparedModelCatalogConfigReplacedError } from "./prepared-model-catalog.errors.js";
 import {
+  getPreparedModelCatalogOwnerSnapshot,
   getPreparedModelCatalogSnapshot,
   loadPreparedModelCatalogSnapshot,
   loadResolvedPublishedModelCatalogOwner,
@@ -103,6 +104,24 @@ describe("prepared model catalog access", () => {
     expect(mocks.getSnapshot).toHaveBeenLastCalledWith(
       expect.objectContaining({ config: mocks.config, readOnly: true }),
     );
+  });
+
+  it("returns the authoritative published owner for a nonblocking read", () => {
+    const published = {
+      ...fullSnapshot,
+      agentId: "main",
+      agentDir: "/tmp/prepared-model-catalog-agent",
+      workspaceDir: "/tmp/prepared-model-catalog-workspace",
+    };
+    mocks.getSnapshot.mockReturnValueOnce(published);
+
+    expect(getPreparedModelCatalogOwnerSnapshot({ agentId: "main", readOnly: true })).toEqual({
+      agentId: "main",
+      agentDir: published.agentDir,
+      workspaceDir: published.workspaceDir,
+      config: mocks.config,
+      modelCatalog: published.modelCatalog,
+    });
   });
 
   it("prefers the full lifecycle generation for read-only catalog loads", async () => {

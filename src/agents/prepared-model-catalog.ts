@@ -111,19 +111,18 @@ function resolveInputs(params: LoadPreparedModelCatalogParams = {}): {
   };
 }
 
-/** Returns the configured catalog for the current generation without starting discovery. */
-export function getPreparedModelCatalogSnapshot(
+function getPreparedModelRuntimeSnapshotForCatalogRead(
   params: LoadPreparedModelCatalogParams = {},
-): ModelCatalogSnapshot | undefined {
+): PreparedModelRuntimeSnapshot | undefined {
   const { activationExact, activationFull, exact, full } = resolveInputs(params);
   const publishedFull = getPreparedModelRuntimeSnapshot(full);
   if (publishedFull && preparedModelRuntimeConfigsMatch(publishedFull.config, full.config)) {
-    return publishedFull.modelCatalog;
+    return publishedFull;
   }
   if (activationFull && activationFull.workspaceDir !== full.workspaceDir) {
     const activatedFull = getPreparedModelRuntimeSnapshot(activationFull);
     if (activatedFull && preparedModelRuntimeConfigsMatch(activatedFull.config, full.config)) {
-      return activatedFull.modelCatalog;
+      return activatedFull;
     }
   }
   if (exact === full) {
@@ -131,15 +130,30 @@ export function getPreparedModelCatalogSnapshot(
   }
   const publishedExact = getPreparedModelRuntimeSnapshot(exact);
   if (publishedExact && preparedModelRuntimeConfigsMatch(publishedExact.config, exact.config)) {
-    return publishedExact.modelCatalog;
+    return publishedExact;
   }
   if (!activationExact || activationExact.workspaceDir === exact.workspaceDir) {
     return undefined;
   }
   const activatedExact = getPreparedModelRuntimeSnapshot(activationExact);
   return activatedExact && preparedModelRuntimeConfigsMatch(activatedExact.config, exact.config)
-    ? activatedExact.modelCatalog
+    ? activatedExact
     : undefined;
+}
+
+/** Returns the authoritative published owner without starting discovery. */
+export function getPreparedModelCatalogOwnerSnapshot(
+  params: LoadPreparedModelCatalogParams = {},
+): ResolvedPublishedModelCatalogOwner | undefined {
+  const snapshot = getPreparedModelRuntimeSnapshotForCatalogRead(params);
+  return snapshot ? resolvePublishedModelCatalogOwner(snapshot) : undefined;
+}
+
+/** Returns the configured catalog for the current generation without starting discovery. */
+export function getPreparedModelCatalogSnapshot(
+  params: LoadPreparedModelCatalogParams = {},
+): ModelCatalogSnapshot | undefined {
+  return getPreparedModelRuntimeSnapshotForCatalogRead(params)?.modelCatalog;
 }
 
 async function resolvePreparedModelCatalogOwnerSnapshotWithPolicy(

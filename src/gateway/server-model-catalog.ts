@@ -87,13 +87,30 @@ export async function loadGatewayModelCatalog(
 export async function readPreparedGatewayModelCatalog(
   params?: LoadGatewayModelCatalogParams,
 ): Promise<GatewayModelChoice[] | undefined> {
-  const { getPreparedModelCatalogSnapshot } = await import("../agents/prepared-model-catalog.js");
+  return (await readPreparedGatewayModelCatalogSnapshot(params))?.entries;
+}
+
+/** Reads the complete already-published owner without starting provider discovery. */
+export async function readPreparedGatewayModelCatalogSnapshot(
+  params?: LoadGatewayModelCatalogParams,
+): Promise<GatewayModelCatalogSnapshot | undefined> {
+  const { getPreparedModelCatalogOwnerSnapshot } =
+    await import("../agents/prepared-model-catalog.js");
   const config = (params?.getConfig ?? getRuntimeConfig)();
-  return getPreparedModelCatalogSnapshot({
+  const owner = getPreparedModelCatalogOwnerSnapshot({
     ...(params?.agentId ? { agentId: params.agentId } : {}),
     ...(params?.agentDir ? { agentDir: params.agentDir } : {}),
     config,
     readOnly: true,
     ...(params?.workspaceDir ? { workspaceDir: params.workspaceDir } : {}),
-  })?.entries;
+  });
+  return owner
+    ? {
+        ...owner.modelCatalog,
+        agentId: owner.agentId,
+        agentDir: owner.agentDir,
+        workspaceDir: owner.workspaceDir,
+        config: owner.config,
+      }
+    : undefined;
 }

@@ -522,6 +522,7 @@ type BuildModelsListResultParams = {
     config: OpenClawConfig;
     snapshot: ModelCatalogSnapshot;
   };
+  allowPartialPreloadedCatalog?: boolean;
   catalogProjector?: ReturnType<typeof createGatewayAgentModelCatalogProjector>;
   preloadedOnly?: boolean;
   routeResolverFactory?: typeof createOpenAIModelRoutesResolver;
@@ -558,7 +559,7 @@ export async function buildModelsListResult(
     view,
     loadCatalog: async (loadParams) => {
       loadedReadOnly = loadParams.readOnly ?? true;
-      if (preloadedCatalog && loadedReadOnly) {
+      if (preloadedCatalog && (loadedReadOnly || params.allowPartialPreloadedCatalog)) {
         usedPreloadedCatalog = true;
         return preloadedCatalog.snapshot;
       }
