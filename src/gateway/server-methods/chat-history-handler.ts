@@ -10,6 +10,7 @@ import {
   validateChatMetadataParams,
 } from "../../../packages/gateway-protocol/src/index.js";
 import { CHAT_HISTORY_MAX_ENTRIES } from "../../../packages/gateway-protocol/src/schema/chat-history-constants.js";
+import { gatewayPreparedCatalogReloadingDetails } from "../../../packages/gateway-protocol/src/startup-unavailable.js";
 import {
   listAgentIds,
   resolveDefaultAgentId,
@@ -114,6 +115,7 @@ async function handleChatMetadataRequest({
       false,
       undefined,
       errorShape(ErrorCodes.UNAVAILABLE, "prepared model catalog is reloading; retry shortly", {
+        details: gatewayPreparedCatalogReloadingDetails(),
         retryable: true,
         retryAfterMs: 250,
       }),

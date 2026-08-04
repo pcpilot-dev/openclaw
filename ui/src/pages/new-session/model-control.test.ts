@@ -1,5 +1,6 @@
 import {
   DEFAULT_GATEWAY_REQUEST_TIMEOUT_MS,
+  gatewayPreparedCatalogReloadingDetails,
   gatewayStartupUnavailableDetails,
 } from "@openclaw/gateway-client/browser";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -37,6 +38,16 @@ function startupUnavailableError(retryAfterMs = 250): GatewayRequestError {
     code: "UNAVAILABLE",
     message: "gateway startup sidecars are still initializing",
     details: gatewayStartupUnavailableDetails(),
+    retryable: true,
+    retryAfterMs,
+  });
+}
+
+function preparedCatalogReloadingError(retryAfterMs = 250): GatewayRequestError {
+  return new GatewayRequestError({
+    code: "UNAVAILABLE",
+    message: "prepared model catalog is reloading",
+    details: gatewayPreparedCatalogReloadingDetails(),
     retryable: true,
     retryAfterMs,
   });
@@ -262,6 +273,36 @@ describe("new-session model runtime", () => {
     expect(control.selected).toBe("openai/gpt-5.6-terra");
     expect(control.thinkingLevel).toBe("high");
     expect(control.isRestoringPreference()).toBe(false);
+  });
+
+  it("retries a prepared-catalog reload and restores the catalog", async () => {
+    vi.useFakeTimers();
+    const models: ModelCatalogEntry[] = [
+      {
+        id: "gpt-5.6-sol",
+        name: "GPT-5.6 Sol",
+        provider: "openai",
+        reasoning: true,
+      },
+    ];
+    const { context, request } = contextWith(models);
+    request.mockReset();
+    request
+      .mockRejectedValueOnce(preparedCatalogReloadingError(250))
+      .mockResolvedValueOnce({ models });
+    const control = new NewSessionModelControl(() => undefined);
+
+    control.load(context, "main", true, {
+      preference: { model: "openai/gpt-5.6-sol" },
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(request).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(249);
+    expect(request).toHaveBeenCalledOnce();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(control.selected).toBe("openai/gpt-5.6-sol");
   });
 
   it("does not retry other retryable UNAVAILABLE errors", async () => {

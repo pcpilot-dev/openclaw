@@ -1316,6 +1316,7 @@ describe("gateway server chat", () => {
         ok: false,
         error: expect.objectContaining({
           code: "UNAVAILABLE",
+          details: { reason: "prepared-catalog-reloading" },
           retryable: true,
           retryAfterMs: 250,
         }),

@@ -1,3 +1,4 @@
+import { resolveGatewayPreparedCatalogReloadRetryAfterMs } from "@openclaw/gateway-client/browser";
 import type { GatewayBrowserClient } from "../../api/gateway.ts";
 import type { GatewaySessionRow } from "../../api/types.ts";
 import { isGatewayMethodAdvertised } from "../../lib/gateway-methods.ts";
@@ -137,6 +138,14 @@ function scheduleChatMetadataRefresh(callback: () => void) {
   globalThis.setTimeout(callback, 50);
 }
 
+function schedulePreparedCatalogReloadRetry(request: ChatMetadataRequest, delayMs: number): void {
+  globalThis.setTimeout(() => {
+    if (ownsChatMetadataRequest(request)) {
+      void refreshChatMetadata(request.host);
+    }
+  }, delayMs);
+}
+
 export async function refreshChatCommands(host: ChatPageHost) {
   await refreshSlashCommands({
     client: host.client,
@@ -254,8 +263,13 @@ export async function refreshChatMetadata(
       await refreshMissingChatMetadata(request, metadataApplied, opts);
     }
     return metadataApplied;
-  } catch {
+  } catch (error) {
     if (ownsChatMetadataRequest(request)) {
+      const reloadRetryAfterMs = resolveGatewayPreparedCatalogReloadRetryAfterMs(error);
+      if (reloadRetryAfterMs !== null) {
+        schedulePreparedCatalogReloadRetry(request, reloadRetryAfterMs);
+        return EMPTY_CHAT_METADATA_APPLY_RESULT;
+      }
       await refreshMissingChatMetadata(request, EMPTY_CHAT_METADATA_APPLY_RESULT, opts);
     }
     return EMPTY_CHAT_METADATA_APPLY_RESULT;

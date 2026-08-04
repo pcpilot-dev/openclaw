@@ -1,6 +1,7 @@
+import { gatewayPreparedCatalogReloadingDetails } from "@openclaw/gateway-client/browser";
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GatewayBrowserClient } from "../../api/gateway.ts";
+import { GatewayRequestError, type GatewayBrowserClient } from "../../api/gateway.ts";
 import * as assistantIdentity from "../../app/assistant-identity.ts";
 import type { ApplicationContext } from "../../app/context.ts";
 import { createInitialUserMessageHandoff } from "../../app/initial-user-message-handoff.ts";
@@ -2454,6 +2455,53 @@ describe("refreshChatMetadata", () => {
       { id: "work-model", name: "Work Model", provider: "openai", available: true },
     ]);
     expect(request).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries prepared-catalog reloads without falling back to models.list", async () => {
+    vi.useFakeTimers();
+    let metadataAttempts = 0;
+    const request = vi.fn(async (method: string) => {
+      if (method === "chat.metadata") {
+        metadataAttempts += 1;
+        if (metadataAttempts === 1) {
+          throw new GatewayRequestError({
+            code: "UNAVAILABLE",
+            message: "prepared model catalog is reloading",
+            details: gatewayPreparedCatalogReloadingDetails(),
+            retryable: true,
+            retryAfterMs: 250,
+          });
+        }
+        return {
+          commands: [],
+          models: [{ id: "prepared-model", name: "Prepared Model", provider: "openai" }],
+        };
+      }
+      throw new Error(`unexpected compatibility request: ${method}`);
+    });
+    const state = createMetadataState(request, {
+      agentsList: { defaultId: "main" } as ChatPageHost["agentsList"],
+      sessionKey: "agent:main:main",
+    });
+
+    await refreshChatMetadata(state);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(request).toHaveBeenLastCalledWith("chat.metadata", { agentId: "main" });
+
+    await vi.advanceTimersByTimeAsync(249);
+    expect(request).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await vi.waitFor(() =>
+      expect(state.chatModelCatalog).toEqual([
+        { id: "prepared-model", name: "Prepared Model", provider: "openai" },
+      ]),
+    );
+
+    expect(request.mock.calls.map(([method]) => method)).toEqual([
+      "chat.metadata",
+      "chat.metadata",
+    ]);
+    vi.useRealTimers();
   });
 
   it("reuses same-agent metadata and fetches a cross-agent catalog", async () => {

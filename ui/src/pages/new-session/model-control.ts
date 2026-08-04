@@ -1,6 +1,7 @@
 import { initialState, Task, TaskStatus } from "@lit/task";
 import {
   DEFAULT_GATEWAY_REQUEST_TIMEOUT_MS,
+  resolveGatewayPreparedCatalogReloadRetryAfterMs,
   resolveGatewayStartupRetryAfterMs,
 } from "@openclaw/gateway-client/browser";
 import type { ReactiveController, ReactiveControllerHost } from "lit";
@@ -88,7 +89,9 @@ async function requestNewSessionMetadata(
         error instanceof Error
           ? error
           : new Error("New-session metadata request failed", { cause: error });
-      const retryAfterMs = resolveGatewayStartupRetryAfterMs(requestError);
+      const retryAfterMs =
+        resolveGatewayPreparedCatalogReloadRetryAfterMs(requestError) ??
+        resolveGatewayStartupRetryAfterMs(requestError);
       if (retryAfterMs === null) {
         throw requestError;
       }
