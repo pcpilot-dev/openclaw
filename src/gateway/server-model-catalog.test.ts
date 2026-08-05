@@ -7,6 +7,7 @@ import {
   readPreparedGatewayModelCatalogSnapshot,
   type GatewayModelCatalogSnapshot,
 } from "./server-model-catalog.js";
+import type { GatewayModelCatalogOwnerSnapshot } from "./server-model-catalog.types.js";
 
 const snapshot: ModelCatalogSnapshot = {
   entries: [{ provider: "openai", id: "gpt-5.5", name: "GPT-5.5" }],
@@ -33,10 +34,10 @@ function ownerConfig(agentId = "main", extra: OpenClawConfig = {}): OpenClawConf
 function ownerSnapshot(
   config: OpenClawConfig,
   modelCatalog: ModelCatalogSnapshot = snapshot,
-  agentId?: string,
+  agentId: string,
 ) {
   return {
-    ...(agentId ? { agentId } : {}),
+    agentId,
     agentDir: "/tmp/gateway-agent",
     config,
     modelCatalog,
@@ -68,7 +69,9 @@ describe("gateway prepared model catalog", () => {
 
   it("reads the published read-only generation directly", async () => {
     const config = ownerConfig();
-    const loadPublishedPreparedModelCatalogOwnerSnapshot = vi.fn(async () => ownerSnapshot(config));
+    const loadPublishedPreparedModelCatalogOwnerSnapshot = vi.fn(async () =>
+      ownerSnapshot(config, snapshot, "main"),
+    );
 
     await expect(
       loadGatewayModelCatalog({
@@ -131,7 +134,12 @@ describe("gateway prepared model catalog", () => {
         ],
       },
     } as OpenClawConfig;
-    const loadPublishedPreparedModelCatalogOwnerSnapshot = vi.fn(async () => ownerSnapshot(config));
+    const ambiguousOwner = {
+      agentDir: "/tmp/gateway-agent",
+      config,
+      modelCatalog: snapshot,
+    } as unknown as GatewayModelCatalogOwnerSnapshot;
+    const loadPublishedPreparedModelCatalogOwnerSnapshot = vi.fn(async () => ambiguousOwner);
 
     await expect(
       loadGatewayModelCatalogSnapshot({
@@ -150,7 +158,7 @@ describe("gateway prepared model catalog", () => {
       routeVariants: [],
     };
     const loadPublishedPreparedModelCatalogOwnerSnapshot = vi.fn(async () =>
-      ownerSnapshot(latestConfig, latestSnapshot),
+      ownerSnapshot(latestConfig, latestSnapshot, "main"),
     );
 
     await expect(
@@ -164,7 +172,9 @@ describe("gateway prepared model catalog", () => {
 
   it("selects the full prepared owner when requested", async () => {
     const config = ownerConfig();
-    const loadPublishedPreparedModelCatalogOwnerSnapshot = vi.fn(async () => ownerSnapshot(config));
+    const loadPublishedPreparedModelCatalogOwnerSnapshot = vi.fn(async () =>
+      ownerSnapshot(config, snapshot, "main"),
+    );
 
     await expect(
       loadGatewayModelCatalogSnapshot({
