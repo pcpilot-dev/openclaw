@@ -4,6 +4,7 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 import {
   loadGatewayModelCatalog,
   loadGatewayModelCatalogSnapshot,
+  readPreparedGatewayModelCatalogSnapshot,
   type GatewayModelCatalogSnapshot,
 } from "./server-model-catalog.js";
 
@@ -43,6 +44,28 @@ function ownerSnapshot(
 }
 
 describe("gateway prepared model catalog", () => {
+  it("reads the configured gateway owner with the startup binding identity", async () => {
+    const config = ownerConfig("worker");
+    const getPreparedModelCatalogOwnerSnapshot = vi.fn(() => ({
+      ...ownerSnapshot(config, snapshot, "worker"),
+      workspaceDir: "/tmp/gateway-workspace",
+    }));
+
+    await expect(
+      readPreparedGatewayModelCatalogSnapshot({
+        agentId: "worker",
+        getConfig: () => config,
+        getPreparedModelCatalogOwnerSnapshot,
+      }),
+    ).resolves.toMatchObject({ agentId: "worker", entries: snapshot.entries });
+    expect(getPreparedModelCatalogOwnerSnapshot).toHaveBeenCalledWith({
+      agentId: "worker",
+      allowGatewaySubagentBinding: true,
+      config,
+      readOnly: true,
+    });
+  });
+
   it("reads the published read-only generation directly", async () => {
     const config = ownerConfig();
     const loadPublishedPreparedModelCatalogOwnerSnapshot = vi.fn(async () => ownerSnapshot(config));

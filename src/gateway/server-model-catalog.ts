@@ -18,9 +18,18 @@ type LoadPublishedPreparedModelCatalogOwnerSnapshot = (params: {
   readOnly?: boolean;
   workspaceDir?: string;
 }) => Promise<PublishedModelCatalogOwnerCandidate>;
+type GetPreparedModelCatalogOwnerSnapshot = (params: {
+  agentId?: string;
+  agentDir?: string;
+  config: GatewayModelCatalogConfig;
+  readOnly?: boolean;
+  workspaceDir?: string;
+  allowGatewaySubagentBinding?: boolean;
+}) => GatewayModelCatalogOwnerSnapshot | undefined;
 type LoadGatewayModelCatalogParams = {
   agentId?: string;
   agentDir?: string;
+  getPreparedModelCatalogOwnerSnapshot?: GetPreparedModelCatalogOwnerSnapshot;
   getConfig?: () => GatewayModelCatalogConfig;
   loadPublishedPreparedModelCatalogOwnerSnapshot?: LoadPublishedPreparedModelCatalogOwnerSnapshot;
   readOnly?: boolean;
@@ -94,14 +103,18 @@ export async function readPreparedGatewayModelCatalog(
 export async function readPreparedGatewayModelCatalogSnapshot(
   params?: LoadGatewayModelCatalogParams,
 ): Promise<GatewayModelCatalogSnapshot | undefined> {
-  const { getPreparedModelCatalogOwnerSnapshot } =
-    await import("../agents/prepared-model-catalog.js");
+  const getPreparedModelCatalogOwnerSnapshot =
+    params?.getPreparedModelCatalogOwnerSnapshot ??
+    (await import("../agents/prepared-model-catalog.js")).getPreparedModelCatalogOwnerSnapshot;
   const config = (params?.getConfig ?? getRuntimeConfig)();
   const owner = getPreparedModelCatalogOwnerSnapshot({
     ...(params?.agentId ? { agentId: params.agentId } : {}),
     ...(params?.agentDir ? { agentDir: params.agentDir } : {}),
     config,
     readOnly: true,
+    // Gateway startup publishes configured owners with this lifecycle identity.
+    // Omitting it makes the nonblocking reader miss every valid prepared owner.
+    allowGatewaySubagentBinding: true,
     ...(params?.workspaceDir ? { workspaceDir: params.workspaceDir } : {}),
   });
   return owner
