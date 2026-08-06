@@ -37,6 +37,18 @@ export type LoadPreparedModelCatalogParams = {
   allowGatewaySubagentBinding?: boolean;
 };
 
+export type LoadStrictPublishedModelCatalogAccessParams = Readonly<
+  Pick<
+    LoadPreparedModelCatalogParams,
+    "agentId" | "agentDir" | "config" | "workspaceDir" | "env" | "allowGatewaySubagentBinding"
+  >
+>;
+
+export type StrictPublishedModelCatalogAccess = ResolvedPublishedModelCatalogOwner &
+  Readonly<{
+    loadFullModelCatalog: () => Promise<ModelCatalogSnapshot>;
+  }>;
+
 type PreparedModelCatalogConfigPolicy = "exact" | "published";
 
 async function materializeRequestedModelCatalog(
@@ -297,6 +309,48 @@ export async function loadResolvedPublishedModelCatalogOwner(
 ): Promise<ResolvedPublishedModelCatalogOwner> {
   return resolvePublishedModelCatalogOwner(
     await loadPublishedPreparedModelCatalogOwnerSnapshot(params),
+  );
+}
+
+/** Resolves an already-published full lifecycle owner without activating or materializing it. */
+export async function loadStrictPublishedModelCatalogAccess(
+  params: LoadStrictPublishedModelCatalogAccessParams = {},
+): Promise<StrictPublishedModelCatalogAccess> {
+  const { activationFull, full } = resolveInputs(params);
+  const candidates =
+    activationFull.workspaceDir === full.workspaceDir ? [full] : [full, activationFull];
+  let missingOwnerError: PreparedModelRuntimeOwnerNotPublishedError | undefined;
+
+  for (const candidate of candidates) {
+    try {
+      const snapshot = await prepareModelRuntimeSnapshot(candidate);
+      if (
+        params.config !== undefined &&
+        !preparedModelRuntimeConfigsMatch(snapshot.config, params.config)
+      ) {
+        throw new PreparedModelCatalogConfigReplacedError(candidate.agentDir);
+      }
+      const owner = resolvePublishedModelCatalogOwner(snapshot);
+      const loadFullModelCatalog = snapshot.loadFullModelCatalog;
+      if (!loadFullModelCatalog) {
+        throw new PreparedModelRuntimeOwnerNotPublishedError(
+          `prepared model catalog owner has no full catalog loader (${owner.agentDir})`,
+        );
+      }
+      return Object.freeze({ ...owner, loadFullModelCatalog });
+    } catch (error) {
+      if (!(error instanceof PreparedModelRuntimeOwnerNotPublishedError)) {
+        throw error;
+      }
+      missingOwnerError = error;
+    }
+  }
+
+  throw (
+    missingOwnerError ??
+    new PreparedModelRuntimeOwnerNotPublishedError(
+      `prepared model catalog owner was not published for ${full.agentDir}`,
+    )
   );
 }
 

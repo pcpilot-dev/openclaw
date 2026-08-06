@@ -13,12 +13,12 @@ import "./get-reply.test-runtime-mocks.js";
 const mocks = vi.hoisted(() => ({
   resolveReplyDirectives: vi.fn(),
   initSessionState: vi.fn(),
-  loadResolvedPublishedModelCatalogOwner: vi.fn(),
+  loadStrictPublishedModelCatalogAccess: vi.fn(),
 }));
 registerGetReplyRuntimeOverrides(mocks);
 
 vi.mock("../../agents/prepared-model-catalog.js", () => ({
-  loadResolvedPublishedModelCatalogOwner: mocks.loadResolvedPublishedModelCatalogOwner,
+  loadStrictPublishedModelCatalogAccess: mocks.loadStrictPublishedModelCatalogAccess,
 }));
 
 let getReplyFromConfig: typeof import("./get-reply.js").getReplyFromConfig;
@@ -35,7 +35,7 @@ describe("getReplyFromConfig configOverride", () => {
     vi.stubEnv("OPENCLAW_ALLOW_SLOW_REPLY_TESTS", "1");
     mocks.resolveReplyDirectives.mockReset();
     mocks.initSessionState.mockReset();
-    mocks.loadResolvedPublishedModelCatalogOwner.mockReset();
+    mocks.loadStrictPublishedModelCatalogAccess.mockReset();
     vi.mocked(loadConfigMock).mockReset();
 
     vi.mocked(loadConfigMock).mockReturnValue({});
@@ -96,7 +96,7 @@ describe("getReplyFromConfig configOverride", () => {
     );
 
     expect(loadConfigMock).not.toHaveBeenCalled();
-    expect(mocks.loadResolvedPublishedModelCatalogOwner).not.toHaveBeenCalled();
+    expect(mocks.loadStrictPublishedModelCatalogAccess).not.toHaveBeenCalled();
     expectResolvedTelegramTimezone(mocks.resolveReplyDirectives);
   });
 
@@ -117,12 +117,14 @@ describe("getReplyFromConfig configOverride", () => {
       },
     } satisfies OpenClawConfig;
     const preparedModelCatalog = { entries: [], routeVariants: [] };
-    mocks.loadResolvedPublishedModelCatalogOwner.mockResolvedValue({
+    const loadFullModelCatalog = vi.fn();
+    mocks.loadStrictPublishedModelCatalogAccess.mockResolvedValue({
       agentId: "main",
       agentDir: "/tmp/prepared-model-owner",
       workspaceDir: "/tmp/prepared-model-workspace",
       config: ownerConfig,
       modelCatalog: preparedModelCatalog,
+      loadFullModelCatalog,
     });
 
     await getReplyFromConfig(
@@ -133,9 +135,11 @@ describe("getReplyFromConfig configOverride", () => {
       } satisfies OpenClawConfig),
     );
 
-    expect(mocks.loadResolvedPublishedModelCatalogOwner).toHaveBeenCalledWith({
+    expect(mocks.loadStrictPublishedModelCatalogAccess).toHaveBeenCalledWith({
       agentId: "main",
+      allowGatewaySubagentBinding: true,
     });
+    expect(loadFullModelCatalog).not.toHaveBeenCalled();
     expectResolvedTelegramTimezone(mocks.resolveReplyDirectives);
     expect(mocks.resolveReplyDirectives).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -143,6 +147,7 @@ describe("getReplyFromConfig configOverride", () => {
         agentDir: "/tmp/prepared-model-owner",
         workspaceDir: "/tmp/prepared-model-workspace",
         preparedModelCatalog,
+        loadFullModelCatalog,
       }),
     );
   });
@@ -150,12 +155,13 @@ describe("getReplyFromConfig configOverride", () => {
   it("rejects a published model owner that crosses the admitted session agent", async () => {
     const { withPublishedRuntimeReplyConfig } = await import("./get-reply-fast-path.js");
     vi.stubEnv("OPENCLAW_TEST_FAST", "0");
-    mocks.loadResolvedPublishedModelCatalogOwner.mockResolvedValue({
+    mocks.loadStrictPublishedModelCatalogAccess.mockResolvedValue({
       agentId: "worker",
       agentDir: "/tmp/prepared-model-owner",
       workspaceDir: "/tmp/prepared-model-workspace",
       config: { agents: { list: [{ id: "worker", default: true }] } },
       modelCatalog: { entries: [], routeVariants: [] },
+      loadFullModelCatalog: vi.fn(),
     });
 
     await expect(
@@ -165,6 +171,23 @@ describe("getReplyFromConfig configOverride", () => {
         withPublishedRuntimeReplyConfig({} satisfies OpenClawConfig),
       ),
     ).rejects.toThrow("reply model catalog owner changed from main to worker");
+  });
+
+  it("fails before reply execution when the published model owner is unavailable", async () => {
+    const { withPublishedRuntimeReplyConfig } = await import("./get-reply-fast-path.js");
+    vi.stubEnv("OPENCLAW_TEST_FAST", "0");
+    mocks.loadStrictPublishedModelCatalogAccess.mockRejectedValue(
+      new Error("prepared model runtime owner was not published"),
+    );
+
+    await expect(
+      getReplyFromConfig(
+        buildGetReplyCtx(),
+        undefined,
+        withPublishedRuntimeReplyConfig({} satisfies OpenClawConfig),
+      ),
+    ).rejects.toThrow("prepared model runtime owner was not published");
+    expect(mocks.resolveReplyDirectives).not.toHaveBeenCalled();
   });
 
   it("marks a frozen complete config without changing its identity or own keys", async () => {

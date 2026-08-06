@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 
 const getReplyPath = resolve(dirname(fileURLToPath(import.meta.url)), "get-reply.ts");
 const lazyRuntimeSpecifiers = [
+  "../../agents/prepared-model-catalog.js",
   "./session-reset-model.runtime.js",
   "./stage-sandbox-media.runtime.js",
 ] as const;

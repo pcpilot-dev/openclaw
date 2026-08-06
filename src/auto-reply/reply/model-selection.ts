@@ -168,6 +168,7 @@ export async function createModelSelectionState(params: {
   hasResolvedHeartbeatModelOverride?: boolean;
   isHeartbeat?: boolean;
   preparedModelCatalog?: ModelCatalogSnapshot;
+  loadFullModelCatalog?: () => Promise<ModelCatalogSnapshot>;
 }): Promise<ModelSelectionState> {
   const timingEnabled = isDiagnosticFlagEnabled("ingress.timing", params.cfg);
   const startMs = timingEnabled ? Date.now() : 0;
@@ -202,6 +203,14 @@ export async function createModelSelectionState(params: {
     (await (
       await loadPreparedModelCatalogRuntime()
     ).loadPreparedModelCatalogSnapshot(catalogScope));
+  let fullModelCatalogPromise: Promise<ModelCatalogSnapshot> | undefined;
+  const loadExpandedModelCatalogSnapshot = (): Promise<ModelCatalogSnapshot> => {
+    if (!params.loadFullModelCatalog) {
+      return loadRuntimeCatalogSnapshot();
+    }
+    fullModelCatalogPromise ??= params.loadFullModelCatalog();
+    return fullModelCatalogPromise;
+  };
   const runtimeModelNormalization = resolveRuntimeNormalization(cfg);
   const { manifestPlugins } = runtimeModelNormalization;
 
@@ -303,7 +312,7 @@ export async function createModelSelectionState(params: {
     staleLegacyAutoFallbackWithoutOrigin;
 
   if (needsModelCatalog) {
-    const catalogSnapshot = await loadRuntimeCatalogSnapshot();
+    const catalogSnapshot = await loadExpandedModelCatalogSnapshot();
     modelCatalog = catalogSnapshot.entries;
     // Only an explicit false is degraded; absent means authoritative.
     catalogAuthoritative = catalogSnapshot.authoritative !== false;

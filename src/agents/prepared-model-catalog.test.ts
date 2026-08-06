@@ -62,6 +62,7 @@ import {
   getPreparedModelCatalogSnapshot,
   loadPreparedModelCatalogSnapshot,
   loadResolvedPublishedModelCatalogOwner,
+  loadStrictPublishedModelCatalogAccess,
   loadPublishedPreparedModelCatalog,
   loadPublishedPreparedModelCatalogOwnerSnapshot,
 } from "./prepared-model-catalog.js";
@@ -122,6 +123,136 @@ describe("prepared model catalog access", () => {
       config: mocks.config,
       modelCatalog: published.modelCatalog,
     });
+  });
+
+  it("resolves strict published access without materializing or acquiring a catalog", async () => {
+    const loadFullModelCatalog = vi.fn(async () => fullSnapshot.modelCatalog);
+    const published = {
+      ...fullSnapshot,
+      agentId: "main",
+      agentDir: "/tmp/prepared-model-catalog-agent",
+      workspaceDir: "/tmp/prepared-model-catalog-workspace",
+      loadFullModelCatalog,
+    };
+    mocks.prepareSnapshot.mockResolvedValueOnce(published);
+
+    await expect(
+      loadStrictPublishedModelCatalogAccess({
+        agentId: "MAIN",
+        allowGatewaySubagentBinding: true,
+      }),
+    ).resolves.toEqual({
+      agentId: "main",
+      agentDir: published.agentDir,
+      workspaceDir: published.workspaceDir,
+      config: mocks.config,
+      modelCatalog: published.modelCatalog,
+      loadFullModelCatalog,
+    });
+
+    expect(mocks.prepareSnapshot).toHaveBeenCalledOnce();
+    expect(mocks.prepareSnapshot).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentId: "MAIN",
+        allowGatewaySubagentBinding: true,
+      }),
+    );
+    expect(loadFullModelCatalog).not.toHaveBeenCalled();
+    expect(mocks.getSnapshot).not.toHaveBeenCalled();
+    expect(mocks.loadSnapshot).not.toHaveBeenCalled();
+    expect(mocks.activateSnapshot).not.toHaveBeenCalled();
+    expect(mocks.acquireSnapshot).not.toHaveBeenCalled();
+    expect(mocks.prepareScopedCatalog).not.toHaveBeenCalled();
+  });
+
+  it("waits for a pending strict published owner before projecting access", async () => {
+    let publishOwner:
+      | ((snapshot: typeof fullSnapshot & Record<string, unknown>) => void)
+      | undefined;
+    mocks.prepareSnapshot.mockReturnValue(
+      new Promise((resolve) => {
+        publishOwner = resolve;
+      }),
+    );
+    const pending = loadStrictPublishedModelCatalogAccess({
+      agentId: "main",
+      allowGatewaySubagentBinding: true,
+    });
+    let settled = false;
+    void pending.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    publishOwner?.({
+      ...fullSnapshot,
+      agentId: "main",
+      agentDir: "/tmp/prepared-model-catalog-agent",
+      workspaceDir: "/tmp/prepared-model-catalog-workspace",
+      loadFullModelCatalog: vi.fn(async () => fullSnapshot.modelCatalog),
+    });
+    await expect(pending).resolves.toMatchObject({ agentId: "main" });
+  });
+
+  it("fails strict published access closed without an ephemeral fallback", async () => {
+    mocks.prepareSnapshot.mockRejectedValue(
+      new PreparedModelRuntimeOwnerNotPublishedError("published owner missing"),
+    );
+
+    await expect(
+      loadStrictPublishedModelCatalogAccess({
+        agentId: "main",
+        allowGatewaySubagentBinding: true,
+      }),
+    ).rejects.toThrow("published owner missing");
+
+    expect(mocks.loadSnapshot).not.toHaveBeenCalled();
+    expect(mocks.activateSnapshot).not.toHaveBeenCalled();
+    expect(mocks.acquireSnapshot).not.toHaveBeenCalled();
+    expect(mocks.prepareScopedCatalog).not.toHaveBeenCalled();
+  });
+
+  it("fails strict published access closed when the owner has no full catalog loader", async () => {
+    mocks.prepareSnapshot.mockResolvedValue({
+      ...fullSnapshot,
+      agentId: "main",
+      agentDir: "/tmp/prepared-model-catalog-agent",
+      workspaceDir: "/tmp/prepared-model-catalog-workspace",
+    });
+
+    await expect(
+      loadStrictPublishedModelCatalogAccess({
+        agentId: "main",
+        allowGatewaySubagentBinding: true,
+      }),
+    ).rejects.toThrow("has no full catalog loader");
+
+    expect(mocks.loadSnapshot).not.toHaveBeenCalled();
+    expect(mocks.activateSnapshot).not.toHaveBeenCalled();
+    expect(mocks.acquireSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("rejects strict published access when an explicit config was replaced", async () => {
+    const requestedConfig = { agents: { defaults: { model: "openai/requested" } } };
+    mocks.prepareSnapshot.mockResolvedValue({
+      ...fullSnapshot,
+      agentId: "main",
+      agentDir: "/tmp/prepared-model-catalog-agent",
+      workspaceDir: "/tmp/prepared-model-catalog-workspace",
+      config: { agents: { defaults: { model: "openai/committed" } } },
+      loadFullModelCatalog: vi.fn(),
+    });
+
+    await expect(
+      loadStrictPublishedModelCatalogAccess({
+        agentId: "main",
+        config: requestedConfig,
+        allowGatewaySubagentBinding: true,
+      }),
+    ).rejects.toBeInstanceOf(PreparedModelCatalogConfigReplacedError);
+    expect(mocks.activateSnapshot).not.toHaveBeenCalled();
+    expect(mocks.acquireSnapshot).not.toHaveBeenCalled();
   });
 
   it("prefers the full lifecycle generation for read-only catalog loads", async () => {
@@ -310,6 +441,14 @@ describe("prepared model catalog access", () => {
     await expect(
       loadResolvedPublishedModelCatalogOwner({ agentId: "worker", readOnly: true }),
     ).rejects.toThrow("did not identify one configured agent");
+    await expect(
+      loadStrictPublishedModelCatalogAccess({
+        agentId: "worker",
+        allowGatewaySubagentBinding: true,
+      }),
+    ).rejects.toThrow("did not identify one configured agent");
+    expect(mocks.activateSnapshot).not.toHaveBeenCalled();
+    expect(mocks.acquireSnapshot).not.toHaveBeenCalled();
   });
 
   it("projects published replacement entries for runtime callers", async () => {

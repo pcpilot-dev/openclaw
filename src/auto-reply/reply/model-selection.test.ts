@@ -16,7 +16,11 @@ import { resolveModelCandidateChain } from "../../agents/model-fallback-candidat
 import type { OpenClawConfig } from "../../config/config.js";
 import type { SessionEntry } from "../../config/sessions.js";
 import { loadSessionEntry, replaceSessionEntry } from "../../config/sessions/session-accessor.js";
-import { createModelSelectionState, resolveContextTokens } from "./model-selection.js";
+import {
+  createModelSelectionState,
+  resolveContextTokens,
+  resolveModelDirectiveSelection,
+} from "./model-selection.js";
 
 const DEFAULT_MOCK_CATALOG_ENTRIES = vi.hoisted(() => [
   { provider: "anthropic", id: "claude-opus-4-6", name: "Claude Opus 4.5" },
@@ -341,6 +345,7 @@ describe("createModelSelectionState catalog loading", () => {
       },
     } as OpenClawConfig;
 
+    const loadFullModelCatalog = vi.fn();
     const state = await createModelSelectionState({
       cfg,
       agentCfg: cfg.agents?.defaults,
@@ -354,10 +359,101 @@ describe("createModelSelectionState catalog loading", () => {
         routeVariants: [],
         authoritative: true,
       },
+      loadFullModelCatalog,
     });
 
     await expect(state.resolveDefaultThinkingLevel()).resolves.toBe("medium");
     expect(loadModelCatalogLocal).not.toHaveBeenCalled();
+    expect(catalogRuntimeMocks.loadModelCatalogSnapshot).not.toHaveBeenCalled();
+    expect(loadFullModelCatalog).not.toHaveBeenCalled();
+  });
+
+  it("loads a prepared full catalog once for an explicit model directive", async () => {
+    const loadFullModelCatalog = vi.fn(async () => ({
+      entries: [
+        { provider: "openai", id: "gpt-static", name: "GPT Static" },
+        { provider: "openai", id: "gpt-full-only", name: "GPT Full Only" },
+      ],
+      routeVariants: [],
+      authoritative: true,
+    }));
+    const cfg = {
+      agents: {
+        defaults: {
+          models: { "openai/*": {} },
+        },
+      },
+    } as OpenClawConfig;
+
+    const state = await createModelSelectionState({
+      cfg,
+      agentCfg: cfg.agents?.defaults,
+      defaultProvider: "openai",
+      defaultModel: "gpt-static",
+      provider: "openai",
+      model: "gpt-static",
+      hasModelDirective: true,
+      preparedModelCatalog: {
+        entries: [{ provider: "openai", id: "gpt-static", name: "GPT Static" }],
+        routeVariants: [],
+        authoritative: true,
+      },
+      loadFullModelCatalog,
+    });
+
+    const selected = resolveModelDirectiveSelection({
+      raw: "openai/gpt-full-only",
+      defaultProvider: "openai",
+      defaultModel: "gpt-static",
+      aliasIndex: state.policyAliasIndex,
+      allowedModelKeys: state.allowedModelKeys,
+      cfg,
+    });
+    expect(selected.selection).toMatchObject({ provider: "openai", model: "gpt-full-only" });
+    await state.resolveThinkingCatalog();
+    await state.resolveDefaultReasoningLevel();
+    expect(loadFullModelCatalog).toHaveBeenCalledOnce();
+    expect(catalogRuntimeMocks.loadModelCatalogSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("loads a prepared full catalog once when a provider wildcard needs expansion", async () => {
+    const loadFullModelCatalog = vi.fn(async () => ({
+      entries: [
+        { provider: "anthropic", id: "claude-opus", name: "Claude Opus" },
+        { provider: "openai", id: "gpt-full-only", name: "GPT Full Only" },
+      ],
+      routeVariants: [],
+      authoritative: true,
+    }));
+    const cfg = {
+      agents: {
+        defaults: {
+          model: { primary: "anthropic/claude-opus" },
+          models: { "openai/*": {} },
+        },
+      },
+    } as OpenClawConfig;
+
+    const state = await createModelSelectionState({
+      cfg,
+      agentCfg: cfg.agents?.defaults,
+      defaultProvider: "anthropic",
+      defaultModel: "claude-opus",
+      provider: "anthropic",
+      model: "claude-opus",
+      hasModelDirective: false,
+      preparedModelCatalog: {
+        entries: [{ provider: "anthropic", id: "claude-opus", name: "Claude Opus" }],
+        routeVariants: [],
+        authoritative: true,
+      },
+      loadFullModelCatalog,
+    });
+
+    expect(state.provider).toBe("openai");
+    expect(state.model).toBe("gpt-full-only");
+    await state.resolveThinkingCatalog();
+    expect(loadFullModelCatalog).toHaveBeenCalledOnce();
     expect(catalogRuntimeMocks.loadModelCatalogSnapshot).not.toHaveBeenCalled();
   });
 

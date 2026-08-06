@@ -266,12 +266,16 @@ export async function getReplyFromConfig(
   let preparedAgentDir: string | undefined;
   let preparedWorkspaceDir: string | undefined;
   let preparedModelCatalog: ModelCatalogSnapshot | undefined;
+  let loadFullModelCatalog: (() => Promise<ModelCatalogSnapshot>) | undefined;
   if (usePublishedModelRuntime && !isFastTestEnv) {
     // Gateway turns consume one committed model-runtime generation. Later config/secret
     // publications must not mix a new global config with an older prepared catalog owner.
     const owner = await (
       await import("../../agents/prepared-model-catalog.js")
-    ).loadResolvedPublishedModelCatalogOwner({ agentId });
+    ).loadStrictPublishedModelCatalogAccess({
+      agentId,
+      allowGatewaySubagentBinding: true,
+    });
     // The published generation may refresh config, directories, and catalog together, but the
     // admitted session must never cross agent ownership while doing so.
     if (!publishedModelCatalogOwnerMatchesAgent(owner, agentId)) {
@@ -282,6 +286,7 @@ export async function getReplyFromConfig(
     preparedAgentDir = owner.agentDir;
     preparedWorkspaceDir = owner.workspaceDir;
     preparedModelCatalog = owner.modelCatalog;
+    loadFullModelCatalog = owner.loadFullModelCatalog;
   }
   const traceAttributes = resolverTiming.measureSync("reply.resolve_trace_context", () => ({
     surface: normalizeOptionalString(finalized.Surface ?? finalized.Provider) ?? "unknown",
@@ -872,6 +877,7 @@ export async function getReplyFromConfig(
       opts: withExtractedFileImages(resolvedOpts, extractedFileImages),
       skillFilter: mergedSkillFilter,
       preparedModelCatalog,
+      loadFullModelCatalog,
     }),
   );
   if (directiveResult.kind === "reply") {
@@ -1032,6 +1038,7 @@ export async function getReplyFromConfig(
         hasResolvedHeartbeatModelOverride,
         isHeartbeat: opts?.isHeartbeat === true,
         preparedModelCatalog,
+        loadFullModelCatalog,
       });
     } catch (error) {
       if (error instanceof ModelSelectionLockedError) {
