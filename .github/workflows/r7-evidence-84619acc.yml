@@ -1,0 +1,770 @@
+name: Gateway r7 Evidence · P 7b89bf143d3c63e916847d58b92b5727fc16e4ca
+run-name: Gateway r7 Evidence · P 7b89bf143d3c63e916847d58b92b5727fc16e4ca · run ${{ github.run_id }} attempt ${{ github.run_attempt }}
+
+on:
+  push:
+    branches:
+      - codex/evidence-gateway-r7-84619acc-h3
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r7-evidence-84619acc
+  cancel-in-progress: false
+
+jobs:
+  evidence:
+    name: Gateway r7 evidence-only heavy proof
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+      OPENCLAW_VITEST_MAX_WORKERS: "2"
+      P_SHA: 7b89bf143d3c63e916847d58b92b5727fc16e4ca
+      BASE_SHA: 435e341a6ccd3db1f0d07504931f32385d10d6df
+      P_TREE: 5f9eef5fd0c3e496910e2b3ab9db31023a43ca94
+      EXPECTED_REPOSITORY: pcpilot-dev/openclaw
+      EXPECTED_REF: refs/heads/codex/evidence-gateway-r7-84619acc-h3
+      WORKFLOW_PATH: .github/workflows/r7-evidence-84619acc.yml
+      PAYLOAD_DIFF_SHA256: 84619acc6d7c8189d25c71c52f954fe771ab2a405d8da8e20885bf0341a1a83d
+      EXPECTED_PACKAGE_MANAGER: pnpm@11.15.1+sha512.81350b07e53c9538a02f1f2303b4290fa2d7be04e56e2a970c4cc4b417dc761de196edabd49d55c7dc9580db81007c44143e4e3d7e462b3000d23c255122d065
+      HARNESS_DIR: ${{ github.workspace }}/harness
+      CANDIDATE_DIR: ${{ github.workspace }}/candidate
+
+    steps:
+      - name: Initialize evidence envelope
+        id: initialize
+        shell: bash
+        timeout-minutes: 2
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/r7-evidence
+          PNPM_STORE_DIR: ${{ runner.temp }}/r7-pnpm-store
+        run: |
+          set -euo pipefail
+          test -n "${RUNNER_TEMP:-}"
+          test -n "${GITHUB_ENV:-}"
+          test "$EVIDENCE_DIR" = "$RUNNER_TEMP/r7-evidence"
+          test "$PNPM_STORE_DIR" = "$RUNNER_TEMP/r7-pnpm-store"
+          printf 'EVIDENCE_DIR=%s\n' "$EVIDENCE_DIR" >> "$GITHUB_ENV"
+          printf 'PNPM_STORE_DIR=%s\n' "$PNPM_STORE_DIR" >> "$GITHUB_ENV"
+          mkdir -p "$EVIDENCE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/job.started"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/initialize.started"
+          set +e
+          (
+            set -euo pipefail
+            printf 'evidence_dir=%s\n' "$EVIDENCE_DIR"
+            printf 'candidate=P:%s\n' "$P_SHA"
+          ) > "$EVIDENCE_DIR/initialize.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/initialize.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/initialize.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/initialize.ended"
+          exit "$rc"
+
+      - name: Checkout event harness H
+        id: checkout_h
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ github.event.after }}
+          path: harness
+          fetch-depth: 2
+          persist-credentials: false
+          clean: true
+
+      - name: Guard event and harness identity
+        id: harness_guard
+        shell: bash
+        timeout-minutes: 5
+        env:
+          EVENT_AFTER: ${{ github.event.after }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_REPOSITORY: ${{ github.repository }}
+          EVENT_H_SHA: ${{ github.sha }}
+          WORKFLOW_H_SHA: ${{ github.workflow_sha }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUNNER_ENVIRONMENT_VALUE: ${{ runner.environment }}
+          RUNNER_OS_VALUE: ${{ runner.os }}
+          RUNNER_ARCH_VALUE: ${{ runner.arch }}
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/harness-guard.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$EVENT_NAME" = "push"
+            test "$EVENT_REPOSITORY" = "$EXPECTED_REPOSITORY"
+            test "$EVENT_REF" = "$EXPECTED_REF"
+            test "$RUN_ATTEMPT" = "1"
+            test "$EVENT_AFTER" = "$EVENT_H_SHA"
+            test "$EVENT_AFTER" = "$WORKFLOW_H_SHA"
+            test "$EVENT_AFTER" != "0000000000000000000000000000000000000000"
+            test "$RUNNER_ENVIRONMENT_VALUE" = "github-hosted"
+            test "$RUNNER_OS_VALUE" = "Linux"
+            test "$RUNNER_ARCH_VALUE" = "X64"
+            test -n "${ImageOS:-}"
+            test -n "${ImageVersion:-}"
+            test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$EVENT_AFTER"
+
+            read -r -a parents <<< "$(git -C "$HARNESS_DIR" rev-list --parents -n 1 "$EVENT_AFTER")"
+            test "${#parents[@]}" -eq 2
+            test "${parents[0]}" = "$EVENT_AFTER"
+            test "${parents[1]}" = "$P_SHA"
+
+            mapfile -t harness_paths < <(git -C "$HARNESS_DIR" diff-tree --no-commit-id --name-only -r "$EVENT_AFTER")
+            test "${#harness_paths[@]}" -eq 1
+            test "${harness_paths[0]}" = "$WORKFLOW_PATH"
+            test -f "$HARNESS_DIR/$WORKFLOW_PATH"
+            test -z "$(git -C "$HARNESS_DIR" status --porcelain=v1 --untracked-files=no)"
+          ) > "$EVIDENCE_DIR/harness-guard.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/harness-guard.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/harness-guard.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/harness-guard.ended"
+          exit "$rc"
+
+      - name: Checkout detached payload P
+        id: checkout_p
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: 7b89bf143d3c63e916847d58b92b5727fc16e4ca
+          path: candidate
+          fetch-depth: 2
+          persist-credentials: false
+          clean: true
+
+      - name: Guard payload identity and scope
+        id: payload_guard
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/payload-guard.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD)" = "$P_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^)" = "$BASE_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^{tree})" = "$P_TREE"
+            if git -C "$CANDIDATE_DIR" symbolic-ref -q HEAD; then
+              printf 'candidate checkout is not detached\n' >&2
+              exit 1
+            fi
+            test -z "$(git -C "$CANDIDATE_DIR" status --porcelain=v1 --untracked-files=no)"
+
+            expected_paths="$RUNNER_TEMP/r7-expected-paths.txt"
+            actual_paths="$RUNNER_TEMP/r7-actual-paths.txt"
+            printf '%s\n' \
+              src/agents/prepared-model-catalog.test.ts \
+              src/agents/prepared-model-catalog.ts \
+              src/auto-reply/reply/get-reply-directives.ts \
+              src/auto-reply/reply/get-reply.config-override.test.ts \
+              src/auto-reply/reply/get-reply.imports.test.ts \
+              src/auto-reply/reply/get-reply.ts \
+              src/auto-reply/reply/model-selection.test.ts \
+              src/auto-reply/reply/model-selection.ts \
+              | LC_ALL=C sort > "$expected_paths"
+            git -C "$CANDIDATE_DIR" diff-tree --no-commit-id --name-only -r "$P_SHA" \
+              | LC_ALL=C sort > "$actual_paths"
+            diff -u "$expected_paths" "$actual_paths"
+
+            read -r insertions deletions files <<< "$(
+              git -C "$CANDIDATE_DIR" diff --numstat "$BASE_SHA" "$P_SHA" \
+                | awk 'BEGIN { i=0; d=0; f=0 } { if ($1 == "-" || $2 == "-") exit 2; i += $1; d += $2; f += 1 } END { print i, d, f }'
+            )"
+            test "$insertions" -eq 341
+            test "$deletions" -eq 10
+            test "$files" -eq 8
+            git -C "$CANDIDATE_DIR" diff --check "$BASE_SHA" "$P_SHA"
+            test "$(git -C "$CANDIDATE_DIR" diff --binary "$BASE_SHA" "$P_SHA" | sha256sum | awk '{print $1}')" = "$PAYLOAD_DIFF_SHA256"
+            git -C "$CANDIDATE_DIR" diff --quiet "$BASE_SHA" "$P_SHA" -- package.json pnpm-lock.yaml
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA:package.json")" = "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA:package.json")"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA:pnpm-lock.yaml")" = "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA:pnpm-lock.yaml")"
+          ) > "$EVIDENCE_DIR/payload-guard.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/payload-guard.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/payload-guard.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/payload-guard.ended"
+          exit "$rc"
+
+      - name: Set up exact Node 24.15.0
+        id: setup_node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24.15.0
+
+      - name: Bind exact pnpm and fresh store
+        id: tooling
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/tooling.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(node --version)" = "v24.15.0"
+            package_manager="$(node -p "require('$CANDIDATE_DIR/package.json').packageManager")"
+            test "$package_manager" = "$EXPECTED_PACKAGE_MANAGER"
+            expected_pnpm="${package_manager#pnpm@}"
+            expected_pnpm="${expected_pnpm%%+*}"
+            corepack enable
+            corepack prepare "$package_manager" --activate
+            test "$(pnpm --version)" = "$expected_pnpm"
+            test ! -e "$PNPM_STORE_DIR"
+            mkdir -p "$PNPM_STORE_DIR"
+            pnpm config set store-dir "$PNPM_STORE_DIR" --global
+            node --version > "$EVIDENCE_DIR/node.version"
+            pnpm --version > "$EVIDENCE_DIR/pnpm.version"
+            printf '%s\n' "$package_manager" > "$EVIDENCE_DIR/package-manager.txt"
+          ) > "$EVIDENCE_DIR/tooling.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/tooling.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/tooling.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/tooling.ended"
+          exit "$rc"
+
+      - name: Require 8 GiB before frozen install
+        id: install_space
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install-space.started"
+          set +e
+          (
+            set -euo pipefail
+            available_kib="$(df -Pk "$GITHUB_WORKSPACE" | awk 'NR == 2 { print $4 }')"
+            test "$available_kib" -ge 8388608
+            printf 'workspace_available_kib=%s\n' "$available_kib"
+          ) > "$EVIDENCE_DIR/install-space.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/install-space.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/install-space.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install-space.ended"
+          exit "$rc"
+
+      - name: Frozen install once
+        id: install
+        shell: bash
+        timeout-minutes: 20
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install.started"
+          if pnpm install --frozen-lockfile 2>&1 | tee "$EVIDENCE_DIR/install.log"; then
+            rc=0
+          else
+            pipeline_status=("${PIPESTATUS[@]}")
+            rc="${pipeline_status[0]}"
+            if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/install.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install.ended"
+          exit "$rc"
+
+      - name: Run pnpm check once
+        id: check
+        shell: bash
+        timeout-minutes: 25
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/check.started"
+          if pnpm check 2>&1 | tee "$EVIDENCE_DIR/check.log"; then
+            rc=0
+          else
+            pipeline_status=("${PIPESTATUS[@]}")
+            rc="${pipeline_status[0]}"
+            if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/check.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/check.ended"
+          exit "$rc"
+
+      - name: Run pnpm test once
+        id: test
+        shell: bash
+        timeout-minutes: 90
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/test.started"
+          if pnpm test 2>&1 | tee "$EVIDENCE_DIR/test.log"; then
+            rc=0
+          else
+            pipeline_status=("${PIPESTATUS[@]}")
+            rc="${pipeline_status[0]}"
+            if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          fi
+          if TEST_LOG="$EVIDENCE_DIR/test.log" TEST_SUMMARY="$EVIDENCE_DIR/test-summary.json" \
+            python3 - 2>&1 <<'PY' | tee "$EVIDENCE_DIR/test-summary.log"; then
+          import json
+          import os
+          import re
+          import sys
+          from pathlib import Path
+
+          ansi = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+          text = ansi.sub("", Path(os.environ["TEST_LOG"]).read_text(encoding="utf-8", errors="replace"))
+          aggregate_pattern = re.compile(
+              r"^\[test\] (passed|failed|skipped) (\d+) Vitest shards? in .*$",
+              re.MULTILINE,
+          )
+          summary_pattern = re.compile(r"^\s*(Test Files|Tests)\s+(.+?)\s+\((\d+)\)\s*$", re.MULTILINE)
+          category_pattern = re.compile(r"(\d+)\s+(passed|failed|skipped|todo|pending)")
+          aggregates = aggregate_pattern.findall(text)
+          errors = []
+          if len(aggregates) != 1:
+              errors.append(f"expected exactly one aggregate shard summary, found {len(aggregates)}")
+              aggregate_status, shard_text = "unparsed", "0"
+          else:
+              aggregate_status, shard_text = aggregates[0]
+          shard_count = int(shard_text)
+          if aggregate_status != "passed":
+              errors.append(f"aggregate status is {aggregate_status}, expected passed")
+          if shard_count < 1:
+              errors.append("aggregate shard count must be positive")
+
+          parsed = {
+              "Test Files": {"summaries": 0, "total": 0, "passed": 0, "failed": 0, "skipped": 0, "todo": 0, "pending": 0},
+              "Tests": {"summaries": 0, "total": 0, "passed": 0, "failed": 0, "skipped": 0, "todo": 0, "pending": 0},
+          }
+          for kind, detail, total_text in summary_pattern.findall(text):
+              record = parsed[kind]
+              record["summaries"] += 1
+              total = int(total_text)
+              record["total"] += total
+              categories = category_pattern.findall(detail)
+              categorized = 0
+              for count_text, category in categories:
+                  count = int(count_text)
+                  record[category] += count
+                  categorized += count
+              if categorized != total:
+                  errors.append(f"{kind} summary categories {categorized} do not equal total {total}")
+
+          for kind, record in parsed.items():
+              if record["summaries"] != shard_count:
+                  errors.append(
+                      f"{kind} summary count {record['summaries']} does not equal shard count {shard_count}"
+                  )
+              if record["total"] < 1:
+                  errors.append(f"{kind} total must be positive")
+              if record["passed"] < 1:
+                  errors.append(f"{kind} passed count must be positive")
+              if record["failed"] != 0:
+                  errors.append(f"{kind} reports {record['failed']} failed")
+
+          summary = {
+              "parserStatus": "PASS" if not errors else "FAIL",
+              "aggregateStatus": aggregate_status,
+              "reportedShards": shard_count,
+              "testFiles": parsed["Test Files"],
+              "tests": parsed["Tests"],
+              "errors": errors,
+          }
+          Path(os.environ["TEST_SUMMARY"]).write_text(
+              json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(summary, sort_keys=True))
+          sys.exit(0 if not errors else 1)
+          PY
+            parser_rc=0
+          else
+            pipeline_status=("${PIPESTATUS[@]}")
+            parser_rc="${pipeline_status[0]}"
+            if test "$parser_rc" -eq 0; then parser_rc="${pipeline_status[1]}"; fi
+          fi
+          if test "$rc" -eq 0 && test "$parser_rc" -ne 0; then rc="$parser_rc"; fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/test.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/test.ended"
+          exit "$rc"
+
+      - name: Require 4 GiB before build
+        id: build_space
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/build-space.started"
+          set +e
+          (
+            set -euo pipefail
+            available_kib="$(df -Pk "$GITHUB_WORKSPACE" | awk 'NR == 2 { print $4 }')"
+            test "$available_kib" -ge 4194304
+            printf 'workspace_available_kib=%s\n' "$available_kib"
+          ) > "$EVIDENCE_DIR/build-space.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/build-space.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/build-space.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/build-space.ended"
+          exit "$rc"
+
+      - name: Run pnpm build once
+        id: build
+        shell: bash
+        timeout-minutes: 40
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/build.started"
+          if pnpm build 2>&1 | tee "$EVIDENCE_DIR/build.log"; then
+            rc=0
+          else
+            pipeline_status=("${PIPESTATUS[@]}")
+            rc="${pipeline_status[0]}"
+            if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/build.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/build.ended"
+          exit "$rc"
+
+      - name: Guard final payload poststate
+        id: poststate
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/poststate.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD)" = "$P_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^{tree})" = "$P_TREE"
+            test -z "$(git -C "$CANDIDATE_DIR" status --porcelain=v1 --untracked-files=no)"
+          ) > "$EVIDENCE_DIR/poststate.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/poststate.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/poststate.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/poststate.ended"
+          exit "$rc"
+
+      - name: Finalize evidence manifest
+        id: finalize
+        if: always()
+        shell: bash
+        timeout-minutes: 10
+        env:
+          EVENT_H_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUNNER_NAME_VALUE: ${{ runner.name }}
+          RUNNER_ENVIRONMENT_VALUE: ${{ runner.environment }}
+          RUNNER_OS_VALUE: ${{ runner.os }}
+          RUNNER_ARCH_VALUE: ${{ runner.arch }}
+          INITIALIZE_OUTCOME: ${{ steps.initialize.outcome }}
+          CHECKOUT_H_OUTCOME: ${{ steps.checkout_h.outcome }}
+          HARNESS_GUARD_OUTCOME: ${{ steps.harness_guard.outcome }}
+          CHECKOUT_P_OUTCOME: ${{ steps.checkout_p.outcome }}
+          PAYLOAD_GUARD_OUTCOME: ${{ steps.payload_guard.outcome }}
+          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
+          TOOLING_OUTCOME: ${{ steps.tooling.outcome }}
+          INSTALL_SPACE_OUTCOME: ${{ steps.install_space.outcome }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          CHECK_OUTCOME: ${{ steps.check.outcome }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          BUILD_SPACE_OUTCOME: ${{ steps.build_space.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          POSTSTATE_OUTCOME: ${{ steps.poststate.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/finalize.started"
+          set +e
+          python3 - 2>&1 <<'PY' | tee "$EVIDENCE_DIR/finalize.log"
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import subprocess
+          from datetime import datetime, timezone
+
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          candidate = pathlib.Path(os.environ["CANDIDATE_DIR"])
+          harness = pathlib.Path(os.environ["HARNESS_DIR"])
+
+          def read_text(name: str, fallback: str | None = None) -> str | None:
+              path = evidence / name
+              return path.read_text(encoding="utf-8").strip() if path.is_file() else fallback
+
+          def git_value(repo: pathlib.Path, *args: str) -> str | None:
+              if not (repo / ".git").exists():
+                  return None
+              result = subprocess.run(
+                  ["git", "-C", str(repo), *args],
+                  check=False,
+                  capture_output=True,
+                  text=True,
+              )
+              return result.stdout.strip() if result.returncode == 0 else None
+
+          def normalized_outcome(value: str) -> str:
+              return "NOT_RUN" if value in {"", "skipped"} else value.upper()
+
+          def exit_code(step: str, status: str) -> int | str:
+              value = read_text(f"{step}.exit")
+              if value is not None and value.isdigit():
+                  return int(value)
+              if status == "SUCCESS":
+                  return 0
+              if status == "NOT_RUN":
+                  return "NOT_RUN"
+              return "UNKNOWN_NONZERO"
+
+          output_files: list[pathlib.Path] = []
+          roots = [candidate / "dist", candidate / "ui" / "dist", candidate / ".artifacts" / "build-all-cache"]
+          for root in roots:
+              if root.is_dir():
+                  output_files.extend(path for path in root.rglob("*") if path.is_file())
+          for owner in (candidate / "packages", candidate / "extensions"):
+              if owner.is_dir():
+                  output_files.extend(
+                      path for path in owner.rglob("*") if path.is_file() and "dist" in path.relative_to(owner).parts
+                  )
+          output_files = sorted(set(output_files), key=lambda path: path.as_posix())
+          output_digest = hashlib.sha256()
+          output_bytes = 0
+          for path in output_files:
+              content = path.read_bytes()
+              relative = path.relative_to(candidate).as_posix()
+              file_digest = hashlib.sha256(content).hexdigest()
+              output_bytes += len(content)
+              output_digest.update(f"{relative}\0{len(content)}\0{file_digest}\n".encode())
+          build_outputs = {
+              "count": len(output_files),
+              "bytes": output_bytes,
+              "sha256": output_digest.hexdigest(),
+          }
+          (evidence / "buildoutputs.sha256.json").write_text(
+              json.dumps(build_outputs, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+
+          outcome_env = {
+              "initialize": "INITIALIZE_OUTCOME",
+              "checkout_h": "CHECKOUT_H_OUTCOME",
+              "harness_guard": "HARNESS_GUARD_OUTCOME",
+              "checkout_p": "CHECKOUT_P_OUTCOME",
+              "payload_guard": "PAYLOAD_GUARD_OUTCOME",
+              "setup_node": "SETUP_NODE_OUTCOME",
+              "tooling": "TOOLING_OUTCOME",
+              "install_space": "INSTALL_SPACE_OUTCOME",
+              "install": "INSTALL_OUTCOME",
+              "check": "CHECK_OUTCOME",
+              "test": "TEST_OUTCOME",
+              "build_space": "BUILD_SPACE_OUTCOME",
+              "build": "BUILD_OUTCOME",
+              "poststate": "POSTSTATE_OUTCOME",
+          }
+          steps = {}
+          for step, env_name in outcome_env.items():
+              status = normalized_outcome(os.environ.get(env_name, ""))
+              steps[step] = {
+                  "status": status,
+                  "exitCode": exit_code(step.replace("_", "-"), status),
+                  "startedAt": read_text(f"{step.replace('_', '-')}.started"),
+                  "endedAt": read_text(f"{step.replace('_', '-')}.ended"),
+              }
+
+          critical = [
+              "initialize",
+              "checkout_h",
+              "harness_guard",
+              "checkout_p",
+              "payload_guard",
+              "setup_node",
+              "tooling",
+              "install_space",
+              "install",
+              "check",
+              "test",
+              "build_space",
+              "build",
+              "poststate",
+          ]
+          runner_identity_complete = (
+              os.environ["RUNNER_ENVIRONMENT_VALUE"] == "github-hosted"
+              and os.environ["RUNNER_OS_VALUE"] == "Linux"
+              and os.environ["RUNNER_ARCH_VALUE"] == "X64"
+              and bool(os.environ.get("ImageOS"))
+              and bool(os.environ.get("ImageVersion"))
+          )
+          passed = all(steps[name]["status"] == "SUCCESS" for name in critical) and runner_identity_complete
+          final_status = {"status": "PASS" if passed else "FAIL", "exit": 0 if passed else 1}
+          (evidence / "finalstatus.json").write_text(
+              json.dumps(final_status, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+
+          workflow_blob = git_value(harness, "rev-parse", f"{os.environ['EVENT_H_SHA']}:{os.environ['WORKFLOW_PATH']}")
+          workflow_file = harness / os.environ["WORKFLOW_PATH"]
+          workflow_content_sha256 = (
+              hashlib.sha256(workflow_file.read_bytes()).hexdigest() if workflow_file.is_file() else None
+          )
+          test_summary_path = evidence / "test-summary.json"
+          test_summary = (
+              json.loads(test_summary_path.read_text(encoding="utf-8"))
+              if test_summary_path.is_file()
+              else {"parserStatus": "NOT_RUN"}
+          )
+          manifest = {
+              "schema": "openclaw.gateway-r7-evidence.v1",
+              "repository": os.environ["EXPECTED_REPOSITORY"],
+              "harness": {
+                  "commit": os.environ["EVENT_H_SHA"],
+                  "tree": git_value(harness, "rev-parse", f"{os.environ['EVENT_H_SHA']}^{{tree}}"),
+                  "parent": os.environ["P_SHA"],
+                  "workflowPath": os.environ["WORKFLOW_PATH"],
+                  "workflowBlobSha": workflow_blob,
+                  "workflowContentSha256": workflow_content_sha256,
+              },
+              "payload": {
+                  "commit": os.environ["P_SHA"],
+                  "tree": os.environ["P_TREE"],
+                  "parent": os.environ["BASE_SHA"],
+                  "diffSha256": os.environ["PAYLOAD_DIFF_SHA256"],
+                  "paths": [
+                      "src/agents/prepared-model-catalog.test.ts",
+                      "src/agents/prepared-model-catalog.ts",
+                      "src/auto-reply/reply/get-reply-directives.ts",
+                      "src/auto-reply/reply/get-reply.config-override.test.ts",
+                      "src/auto-reply/reply/get-reply.imports.test.ts",
+                      "src/auto-reply/reply/get-reply.ts",
+                      "src/auto-reply/reply/model-selection.test.ts",
+                      "src/auto-reply/reply/model-selection.ts",
+                  ],
+              },
+              "run": {
+                  "id": os.environ["RUN_ID"],
+                  "attempt": int(os.environ["RUN_ATTEMPT"]),
+                  "event": os.environ["EVENT_NAME"],
+                  "ref": os.environ["EVENT_REF"],
+                  "url": f"https://github.com/{os.environ['EXPECTED_REPOSITORY']}/actions/runs/{os.environ['RUN_ID']}",
+                  "startedAt": read_text("job.started"),
+                  "endedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              },
+              "runner": {
+                  "name": os.environ["RUNNER_NAME_VALUE"],
+                  "environment": os.environ["RUNNER_ENVIRONMENT_VALUE"],
+                  "os": os.environ["RUNNER_OS_VALUE"],
+                  "arch": os.environ["RUNNER_ARCH_VALUE"],
+                  "imageOS": os.environ.get("ImageOS"),
+                  "imageVersion": os.environ.get("ImageVersion"),
+              },
+              "toolchain": {
+                  "node": read_text("node.version", "NOT_RUN"),
+                  "pnpm": read_text("pnpm.version", "NOT_RUN"),
+                  "packageManager": read_text("package-manager.txt", "NOT_RUN"),
+                  "lockfileSha256": hashlib.sha256((candidate / "pnpm-lock.yaml").read_bytes()).hexdigest()
+                  if (candidate / "pnpm-lock.yaml").is_file()
+                  else None,
+              },
+              "commands": [
+                  "pnpm install --frozen-lockfile",
+                  "pnpm check",
+                  "pnpm test",
+                  "pnpm build",
+              ],
+              "steps": steps,
+              "testSummary": test_summary,
+              "buildOutputs": build_outputs,
+              "final": final_status,
+          }
+          (evidence / "manifest.partial.json").write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(final_status, sort_keys=True))
+          PY
+          pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          rc="${pipeline_status[0]}"
+          if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/finalize.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/finalize.ended"
+          exit "$rc"
+
+      - name: Seal final log hashes and manifest
+        id: seal
+        if: always()
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          partial_path = evidence / "manifest.partial.json"
+          manifest = json.loads(partial_path.read_text(encoding="utf-8"))
+          required_logs = sorted(
+              [
+                  "initialize.log",
+                  "harness-guard.log",
+                  "payload-guard.log",
+                  "tooling.log",
+                  "install-space.log",
+                  "install.log",
+                  "check.log",
+                  "test.log",
+                  "test-summary.log",
+                  "build-space.log",
+                  "build.log",
+                  "poststate.log",
+                  "finalize.log",
+              ]
+          )
+          log_entries = sorted(evidence.glob("*.log"), key=lambda path: path.name)
+          if manifest["final"]["status"] == "PASS":
+              actual_logs = [path.name for path in log_entries]
+              if actual_logs != required_logs:
+                  raise SystemExit(
+                      f"PASS log contract mismatch: actual={actual_logs!r} expected={required_logs!r}"
+                  )
+              invalid_logs = [path.name for path in log_entries if not path.is_file() or path.is_symlink()]
+              if invalid_logs:
+                  raise SystemExit(f"PASS log contract requires regular files: {invalid_logs!r}")
+          log_hashes = {
+              path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in log_entries
+              if path.is_file() and not path.is_symlink()
+          }
+          manifest["logsSha256"] = log_hashes
+          manifest_path = evidence / "manifest.json"
+          manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          for name, expected in log_hashes.items():
+              actual = hashlib.sha256((evidence / name).read_bytes()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f"final log hash drift: {name}")
+          print(json.dumps({"sealedLogs": len(log_hashes), "manifest": manifest_path.name}, sort_keys=True))
+          PY
+
+      - name: Upload evidence envelope
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: r7-evidence-7b89bf143d3c63e916847d58b92b5727fc16e4ca-${{ github.run_id }}-attempt-1
+          path: |
+            ${{ runner.temp }}/r7-evidence/*.log
+            ${{ runner.temp }}/r7-evidence/manifest.json
+            ${{ runner.temp }}/r7-evidence/buildoutputs.sha256.json
+            ${{ runner.temp }}/r7-evidence/finalstatus.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
