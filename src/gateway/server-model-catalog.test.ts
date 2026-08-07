@@ -33,7 +33,7 @@ function ownerConfig(agentId = "main", extra: OpenClawConfig = {}): OpenClawConf
 
 function ownerSnapshot(
   config: OpenClawConfig,
-  modelCatalog: ModelCatalogSnapshot = snapshot,
+  modelCatalog: ModelCatalogSnapshot,
   agentId: string,
 ) {
   return {

@@ -2,8 +2,6 @@
 import {
   hasLegacyAutoFallbackWithoutOrigin,
   resolveAgentConfig,
-  resolveAgentDir,
-  resolveDefaultAgentId,
 } from "../../agents/agent-scope.js";
 import { isStoredCredentialCompatibleWithAuthProvider } from "../../agents/auth-profiles/order.js";
 import { clearSessionAuthProfileOverride } from "../../agents/auth-profiles/session-override.js";
@@ -47,6 +45,7 @@ export {
 } from "./model-selection-directive.js";
 export { resolveContextTokens } from "./model-selection-context.js";
 import { normalizeRuntimeRef, resolveRuntimeNormalization } from "./model-runtime-normalization.js";
+import { createModelSelectionCatalogLoader } from "./model-selection-catalog-loader.js";
 import {
   isStaleHeartbeatAutoFallbackOverride,
   normalizeStoredRuntimeModelRef,
@@ -119,16 +118,9 @@ export function createFastTestModelSelectionState(params: {
   };
 }
 
-const modelCatalogRuntimeLoader = createLazyImportLoader(
-  () => import("../../agents/model-catalog.runtime.js"),
-);
 const sessionPersistenceRuntimeLoader = createLazyImportLoader(
   () => import("./session-entry-persistence.js"),
 );
-
-function loadPreparedModelCatalogRuntime() {
-  return modelCatalogRuntimeLoader.load();
-}
 
 function loadSessionPersistenceRuntime() {
   return sessionPersistenceRuntimeLoader.load();
@@ -192,25 +184,16 @@ export async function createModelSelectionState(params: {
     defaultProvider,
     defaultModel,
   } = params;
-  const catalogAgentId = params.agentId ?? resolveDefaultAgentId(cfg);
-  const catalogScope = {
+  const {
+    loadExpandedModelCatalogSnapshot,
+    loadManifestModelCatalog,
+    loadRuntimeModelCatalogSnapshot,
+  } = createModelSelectionCatalogLoader({
     config: cfg,
-    agentId: catalogAgentId,
-    agentDir: resolveAgentDir(cfg, catalogAgentId),
-  };
-  const loadRuntimeCatalogSnapshot = async (): Promise<ModelCatalogSnapshot> =>
-    params.preparedModelCatalog ??
-    (await (
-      await loadPreparedModelCatalogRuntime()
-    ).loadPreparedModelCatalogSnapshot(catalogScope));
-  let fullModelCatalogPromise: Promise<ModelCatalogSnapshot> | undefined;
-  const loadExpandedModelCatalogSnapshot = (): Promise<ModelCatalogSnapshot> => {
-    if (!params.loadFullModelCatalog) {
-      return loadRuntimeCatalogSnapshot();
-    }
-    fullModelCatalogPromise ??= params.loadFullModelCatalog();
-    return fullModelCatalogPromise;
-  };
+    agentId: params.agentId,
+    preparedModelCatalog: params.preparedModelCatalog,
+    loadFullModelCatalog: params.loadFullModelCatalog,
+  });
   const runtimeModelNormalization = resolveRuntimeNormalization(cfg);
   const { manifestPlugins } = runtimeModelNormalization;
 
@@ -572,11 +555,7 @@ export async function createModelSelectionState(params: {
     if (manifestModelCatalog) {
       return manifestModelCatalog;
     }
-    const { loadManifestModelCatalog } = await loadPreparedModelCatalogRuntime();
-    manifestModelCatalog = loadManifestModelCatalog({
-      config: cfg,
-      fallbackToMetadataScan: false,
-    });
+    manifestModelCatalog = await loadManifestModelCatalog();
     logStage("manifest-catalog-loaded", `entries=${manifestModelCatalog.length}`);
     return manifestModelCatalog;
   };
@@ -613,7 +592,7 @@ export async function createModelSelectionState(params: {
     const shouldHydrateRuntimeCatalog =
       !modelCatalog && (!selectedCatalogEntry || selectedCatalogEntry.reasoning === undefined);
     if (shouldHydrateRuntimeCatalog) {
-      modelCatalog = (await loadRuntimeCatalogSnapshot()).entries;
+      modelCatalog = (await loadRuntimeModelCatalogSnapshot()).entries;
       logStage("catalog-loaded-for-thinking", `entries=${modelCatalog.length}`);
       const runtimeCatalog = buildThinkingCatalog(modelCatalog);
       const runtimeSelectedEntry = findSelectedCatalogEntry({
@@ -708,7 +687,7 @@ export async function createModelSelectionState(params: {
       (!catalogForReasoning || catalogForReasoning.length === 0) &&
       selectedReasoningEntry?.reasoning === undefined
     ) {
-      modelCatalog = (await loadRuntimeCatalogSnapshot()).entries;
+      modelCatalog = (await loadRuntimeModelCatalogSnapshot()).entries;
       logStage("catalog-loaded-for-reasoning", `entries=${modelCatalog.length}`);
       catalogForReasoning = modelCatalog;
     }
