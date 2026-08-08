@@ -1,0 +1,1132 @@
+name: Gateway r7 trusted-proxy attribution B1 · Base vs P2
+run-name: Gateway r7 trusted-proxy attribution B1 · run ${{ github.run_id }} attempt ${{ github.run_attempt }}
+
+on:
+  push:
+    branches:
+      - codex/evidence-gateway-r7-trusted-proxy-b1
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r7-trusted-proxy-attribution-b1
+  cancel-in-progress: false
+
+jobs:
+  attribution:
+    name: Hash-bound Base/P2 trusted-proxy attribution B1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      CI: "true"
+      NODE_OPTIONS: --max-old-space-size=8192
+      OPENCLAW_VITEST_MAX_WORKERS: "2"
+      BASE_SHA: 435e341a6ccd3db1f0d07504931f32385d10d6df
+      BASE_TREE: 916f825917a49da59c180a4cdabec3f0ce08227e
+      P_SHA: 7b89bf143d3c63e916847d58b92b5727fc16e4ca
+      P_TREE: 5f9eef5fd0c3e496910e2b3ab9db31023a43ca94
+      P2_SHA: 7492177a7068ca7481dd355f37b2d7a21630e9bc
+      P2_TREE: 39349f53cf8b6e5fbed55c8769ed5e5905965894
+      CUMULATIVE_DIFF_SHA256: 0232806223e4a84de70ad1a6901d9e537cc081fe2043454c0dfaf1a425b0b8d0
+      TEST_BLOB_SHA: b976c03c3adfb223685bb85d54293071278bb072
+      PACKAGE_BLOB_SHA: f63ea7030f84032ec3021b3459084655dd584e9a
+      LOCK_BLOB_SHA: e9940a0c1404b1b6c584701351a93282f12bab77
+      GATEWAY_SERVER_CONFIG_BLOB_SHA: bb4cbaec4947f5b61732478498a77d30ba83800a
+      SHARED_CONFIG_BLOB_SHA: 9c5342e3498633bc72a29b9639ac620b799f73f9
+      TIMEOUT_CONTRACT_BLOB_SHA: 5816139df0ac52117d330775267298a08082017a
+      RUN_VITEST_BLOB_SHA: 4f8b6d1abd0c94016f6c5f56f05ce219e8d9dfaa
+      PNPM_RUNNER_BLOB_SHA: cee9c7facf4c85ec01c7aa690acea6719aca4746
+      EXPECTED_PACKAGE_MANAGER: pnpm@11.15.1+sha512.81350b07e53c9538a02f1f2303b4290fa2d7be04e56e2a970c4cc4b417dc761de196edabd49d55c7dc9580db81007c44143e4e3d7e462b3000d23c255122d065
+      EXPECTED_REPOSITORY: pcpilot-dev/openclaw
+      EXPECTED_REF: refs/heads/codex/evidence-gateway-r7-trusted-proxy-b1
+      WORKFLOW_PATH: .github/workflows/r7-trusted-proxy-attribution-b1.yml
+      HARNESS_DIR: ${{ github.workspace }}/harness
+      BASE_DIR: ${{ github.workspace }}/base
+      P2_DIR: ${{ github.workspace }}/p2
+      TARGET_FILE: src/gateway/server.auth.trusted-proxy-device-autoapprove.test.ts
+      TARGET_NAME: trusted-proxy browser device auto-approval rejects a foreign-key connect for an already-paired deviceId
+
+    steps:
+      - name: Initialize evidence envelope
+        id: initialize
+        shell: bash
+        timeout-minutes: 2
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/r7-trusted-proxy-attribution
+          BASE_STORE_DIR: ${{ runner.temp }}/r7-trusted-proxy-base-store
+          P2_STORE_DIR: ${{ runner.temp }}/r7-trusted-proxy-p2-store
+        run: |
+          set -euo pipefail
+          test -n "${RUNNER_TEMP:-}"
+          test -n "${GITHUB_ENV:-}"
+          test "$EVIDENCE_DIR" = "$RUNNER_TEMP/r7-trusted-proxy-attribution"
+          test "$BASE_STORE_DIR" = "$RUNNER_TEMP/r7-trusted-proxy-base-store"
+          test "$P2_STORE_DIR" = "$RUNNER_TEMP/r7-trusted-proxy-p2-store"
+          {
+            printf 'EVIDENCE_DIR=%s\n' "$EVIDENCE_DIR"
+            printf 'BASE_STORE_DIR=%s\n' "$BASE_STORE_DIR"
+            printf 'P2_STORE_DIR=%s\n' "$P2_STORE_DIR"
+          } >> "$GITHUB_ENV"
+          mkdir -p "$EVIDENCE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/job.started"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/initialize.started"
+          set +e
+          (
+            set -euo pipefail
+            printf 'base=%s\n' "$BASE_SHA"
+            printf 'p2=%s\n' "$P2_SHA"
+            printf 'target=%s\n' "$TARGET_NAME"
+          ) > "$EVIDENCE_DIR/initialize.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/initialize.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/initialize.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/initialize.ended"
+          exit "$rc"
+
+      - name: Checkout event harness H
+        id: checkout_h
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ github.event.after }}
+          path: harness
+          fetch-depth: 2
+          persist-credentials: false
+          clean: true
+
+      - name: Guard event, harness, and runner identity
+        id: harness_guard
+        shell: bash
+        timeout-minutes: 5
+        env:
+          EVENT_AFTER: ${{ github.event.after }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_REPOSITORY: ${{ github.repository }}
+          EVENT_H_SHA: ${{ github.sha }}
+          WORKFLOW_H_SHA: ${{ github.workflow_sha }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUNNER_ENVIRONMENT_VALUE: ${{ runner.environment }}
+          RUNNER_OS_VALUE: ${{ runner.os }}
+          RUNNER_ARCH_VALUE: ${{ runner.arch }}
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/harness-guard.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$EVENT_NAME" = "push"
+            test "$EVENT_REPOSITORY" = "$EXPECTED_REPOSITORY"
+            test "$EVENT_REF" = "$EXPECTED_REF"
+            test "$RUN_ATTEMPT" = "1"
+            test "$EVENT_AFTER" = "$EVENT_H_SHA"
+            test "$EVENT_AFTER" = "$WORKFLOW_H_SHA"
+            test "$EVENT_AFTER" != "0000000000000000000000000000000000000000"
+            test "$RUNNER_ENVIRONMENT_VALUE" = "github-hosted"
+            test "$RUNNER_OS_VALUE" = "Linux"
+            test "$RUNNER_ARCH_VALUE" = "X64"
+            test -n "${ImageOS:-}"
+            test -n "${ImageVersion:-}"
+            test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$EVENT_AFTER"
+            read -r -a parents <<< "$(git -C "$HARNESS_DIR" rev-list --parents -n 1 "$EVENT_AFTER")"
+            test "${#parents[@]}" -eq 2
+            test "${parents[0]}" = "$EVENT_AFTER"
+            test "${parents[1]}" = "$P2_SHA"
+            mapfile -t paths < <(git -C "$HARNESS_DIR" diff-tree --no-commit-id --name-only -r "$EVENT_AFTER")
+            test "${#paths[@]}" -eq 1
+            test "${paths[0]}" = "$WORKFLOW_PATH"
+            test -f "$HARNESS_DIR/$WORKFLOW_PATH"
+            test -z "$(git -C "$HARNESS_DIR" status --porcelain=v1 --untracked-files=no)"
+          ) > "$EVIDENCE_DIR/harness-guard.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/harness-guard.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/harness-guard.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/harness-guard.ended"
+          exit "$rc"
+
+      - name: Checkout detached Base
+        id: checkout_base
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: 435e341a6ccd3db1f0d07504931f32385d10d6df
+          path: base
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Checkout detached P2
+        id: checkout_p2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: 7492177a7068ca7481dd355f37b2d7a21630e9bc
+          path: p2
+          fetch-depth: 3
+          persist-credentials: false
+          clean: true
+
+      - name: Guard Base and P2 identities
+        id: source_guard
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/source-guard.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(git -C "$BASE_DIR" rev-parse HEAD)" = "$BASE_SHA"
+            test "$(git -C "$BASE_DIR" rev-parse HEAD^{tree})" = "$BASE_TREE"
+            test "$(git -C "$P2_DIR" rev-parse HEAD)" = "$P2_SHA"
+            test "$(git -C "$P2_DIR" rev-parse HEAD^{tree})" = "$P2_TREE"
+            test "$(git -C "$P2_DIR" rev-parse HEAD^)" = "$P_SHA"
+            test "$(git -C "$P2_DIR" rev-parse HEAD^^)" = "$BASE_SHA"
+            test "$(git -C "$P2_DIR" rev-parse "$P_SHA^{tree}")" = "$P_TREE"
+            read -r -a p2_parents <<< "$(git -C "$P2_DIR" rev-list --parents -n 1 "$P2_SHA")"
+            test "${#p2_parents[@]}" -eq 2
+            test "${p2_parents[0]}" = "$P2_SHA"
+            test "${p2_parents[1]}" = "$P_SHA"
+            read -r -a p_parents <<< "$(git -C "$P2_DIR" rev-list --parents -n 1 "$P_SHA")"
+            test "${#p_parents[@]}" -eq 2
+            test "${p_parents[0]}" = "$P_SHA"
+            test "${p_parents[1]}" = "$BASE_SHA"
+            if git -C "$BASE_DIR" symbolic-ref -q HEAD || git -C "$P2_DIR" symbolic-ref -q HEAD; then
+              printf 'a source checkout is not detached\n' >&2
+              exit 1
+            fi
+            test -z "$(git -C "$BASE_DIR" status --porcelain=v1 --untracked-files=all)"
+            test -z "$(git -C "$P2_DIR" status --porcelain=v1 --untracked-files=all)"
+
+            expected_paths="$RUNNER_TEMP/r7-attribution-expected-paths.txt"
+            actual_paths="$RUNNER_TEMP/r7-attribution-actual-paths.txt"
+            printf '%s\n' \
+              src/agents/prepared-model-catalog.test.ts \
+              src/agents/prepared-model-catalog.ts \
+              src/auto-reply/reply/get-reply-directives.ts \
+              src/auto-reply/reply/get-reply.config-override.test.ts \
+              src/auto-reply/reply/get-reply.imports.test.ts \
+              src/auto-reply/reply/get-reply.ts \
+              src/auto-reply/reply/model-selection-catalog-loader.ts \
+              src/auto-reply/reply/model-selection.test.ts \
+              src/auto-reply/reply/model-selection.ts \
+              src/gateway/server-methods/models-list-auth-resolver.ts \
+              src/gateway/server-methods/models-list-result.ts \
+              src/gateway/server-model-catalog.test.ts \
+              | LC_ALL=C sort > "$expected_paths"
+            git -C "$P2_DIR" diff --name-only "$BASE_SHA" "$P2_SHA" | LC_ALL=C sort > "$actual_paths"
+            diff -u "$expected_paths" "$actual_paths"
+            read -r insertions deletions files <<< "$(
+              git -C "$P2_DIR" diff --numstat "$BASE_SHA" "$P2_SHA" \
+                | awk 'BEGIN { i=0; d=0; f=0 } { if ($1 == "-" || $2 == "-") exit 2; i += $1; d += $2; f += 1 } END { print i, d, f }'
+            )"
+            test "$insertions" -eq 463
+            test "$deletions" -eq 96
+            test "$files" -eq 12
+            git -C "$P2_DIR" diff --check "$BASE_SHA" "$P2_SHA"
+            test "$(git -C "$P2_DIR" diff --full-index --binary "$BASE_SHA" "$P2_SHA" | sha256sum | awk '{print $1}')" = "$CUMULATIVE_DIFF_SHA256"
+
+            verify_blob() {
+              local path="$1"
+              local expected="$2"
+              test "$(git -C "$BASE_DIR" rev-parse "$BASE_SHA:$path")" = "$expected"
+              test "$(git -C "$P2_DIR" rev-parse "$P2_SHA:$path")" = "$expected"
+            }
+            verify_blob "$TARGET_FILE" "$TEST_BLOB_SHA"
+            verify_blob package.json "$PACKAGE_BLOB_SHA"
+            verify_blob pnpm-lock.yaml "$LOCK_BLOB_SHA"
+            verify_blob test/vitest/vitest.gateway-server.config.ts "$GATEWAY_SERVER_CONFIG_BLOB_SHA"
+            verify_blob test/vitest/vitest.shared.config.ts "$SHARED_CONFIG_BLOB_SHA"
+            verify_blob test/vitest/vitest.timeouts.ts "$TIMEOUT_CONTRACT_BLOB_SHA"
+            verify_blob scripts/run-vitest.mjs "$RUN_VITEST_BLOB_SHA"
+            verify_blob scripts/pnpm-runner.mjs "$PNPM_RUNNER_BLOB_SHA"
+            test "$(grep -Ec '^  test\(' "$BASE_DIR/$TARGET_FILE")" -eq 11
+            test "$(grep -Ec '^  test\(' "$P2_DIR/$TARGET_FILE")" -eq 11
+            if grep -Eq '\.(skip|only|todo)\(' "$BASE_DIR/$TARGET_FILE" "$P2_DIR/$TARGET_FILE"; then
+              printf 'skip/only/todo is forbidden in the bound test file\n' >&2
+              exit 1
+            fi
+            grep -nF '120_000' "$BASE_DIR/test/vitest/vitest.timeouts.ts" "$P2_DIR/test/vitest/vitest.timeouts.ts"
+          ) > "$EVIDENCE_DIR/source-guard.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/source-guard.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/source-guard.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/source-guard.ended"
+          exit "$rc"
+
+      - name: Set up exact Node 24.15.0
+        id: setup_node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24.15.0
+
+      - name: Bind exact pnpm and test tooling
+        id: tooling
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/tooling.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(node --version)" = "v24.15.0"
+            test "$(node -p "require('$BASE_DIR/package.json').packageManager")" = "$EXPECTED_PACKAGE_MANAGER"
+            test "$(node -p "require('$P2_DIR/package.json').packageManager")" = "$EXPECTED_PACKAGE_MANAGER"
+            expected_pnpm="${EXPECTED_PACKAGE_MANAGER#pnpm@}"
+            expected_pnpm="${expected_pnpm%%+*}"
+            corepack enable
+            corepack prepare "$EXPECTED_PACKAGE_MANAGER" --activate
+            test "$(pnpm --version)" = "$expected_pnpm"
+            test -x /usr/bin/time
+            test ! -e "$BASE_STORE_DIR"
+            test ! -e "$P2_STORE_DIR"
+            node --version > "$EVIDENCE_DIR/node.version.txt"
+            pnpm --version > "$EVIDENCE_DIR/pnpm.version.txt"
+            printf '%s\n' "$EXPECTED_PACKAGE_MANAGER" > "$EVIDENCE_DIR/package-manager.txt"
+          ) > "$EVIDENCE_DIR/tooling.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/tooling.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/tooling.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/tooling.ended"
+          exit "$rc"
+
+      - name: Require workspace headroom
+        id: disk_guard
+        shell: bash
+        timeout-minutes: 2
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/disk-guard.started"
+          set +e
+          (
+            set -euo pipefail
+            available_kib="$(df -Pk "$GITHUB_WORKSPACE" | awk 'NR == 2 { print $4 }')"
+            test "$available_kib" -ge 12582912
+            printf 'workspace_available_kib=%s\n' "$available_kib"
+          ) > "$EVIDENCE_DIR/disk-guard.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/disk-guard.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/disk-guard.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/disk-guard.ended"
+          exit "$rc"
+
+      - name: Frozen install Base and P2 once each
+        id: install_pair
+        shell: bash
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install-pair.started"
+          mkdir -p "$BASE_STORE_DIR" "$P2_STORE_DIR"
+          set +e
+          (
+            cd "$BASE_DIR"
+            pnpm install --frozen-lockfile --store-dir "$BASE_STORE_DIR"
+          ) 2>&1 | tee "$EVIDENCE_DIR/base-install.log"
+          base_pipeline=("${PIPESTATUS[@]}")
+          base_rc="${base_pipeline[0]}"
+          if test "$base_rc" -eq 0; then base_rc="${base_pipeline[1]}"; fi
+          printf '%s\n' "$base_rc" > "$EVIDENCE_DIR/base-install.exit"
+
+          (
+            cd "$P2_DIR"
+            pnpm install --frozen-lockfile --store-dir "$P2_STORE_DIR"
+          ) 2>&1 | tee "$EVIDENCE_DIR/p2-install.log"
+          p2_pipeline=("${PIPESTATUS[@]}")
+          p2_rc="${p2_pipeline[0]}"
+          if test "$p2_rc" -eq 0; then p2_rc="${p2_pipeline[1]}"; fi
+          printf '%s\n' "$p2_rc" > "$EVIDENCE_DIR/p2-install.exit"
+          set -e
+
+          pair_rc=0
+          if test "$base_rc" -ne 0 || test "$p2_rc" -ne 0; then pair_rc=1; fi
+          printf '%s\n' "$pair_rc" > "$EVIDENCE_DIR/install-pair.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install-pair.ended"
+          exit "$pair_rc"
+
+      - name: Run bound Base and P2 attribution once each
+        id: attribution_pair
+        shell: bash
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/attribution-pair.started"
+
+          capture_resources() {
+            local label="$1"
+            date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/$label.started"
+            set +e
+            (
+              set -euo pipefail
+              printf 'captured_at_utc='; date -u +%Y-%m-%dT%H:%M:%SZ
+              printf 'nproc='; nproc
+              printf '[df]\n'
+              df -Pk "$GITHUB_WORKSPACE"
+              printf '[meminfo]\n'
+              awk '/^(MemTotal|MemFree|MemAvailable|SwapTotal|SwapFree):/ { print }' /proc/meminfo
+              for pressure in cpu memory io; do
+                printf '[psi:%s]\n' "$pressure"
+                cat "/proc/pressure/$pressure"
+              done
+            ) > "$EVIDENCE_DIR/$label.resources.txt" 2>&1
+            local rc=$?
+            printf '%s\n' "$rc" > "$EVIDENCE_DIR/$label.exit"
+            date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/$label.ended"
+            return 0
+          }
+
+          set +e
+          capture_resources base-before
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/base-test.started"
+          (
+            cd "$BASE_DIR"
+            BOUND_JSON="$EVIDENCE_DIR/base-test.vitest.json"
+            GITHUB_WORKSPACE="$BASE_DIR" /usr/bin/time -v -o "$EVIDENCE_DIR/base-test.time" \
+              node scripts/run-vitest.mjs run \
+                --config test/vitest/vitest.gateway-server.config.ts \
+                src/gateway/server.auth.trusted-proxy-device-autoapprove.test.ts \
+                --reporter=verbose \
+                --reporter=json \
+                --outputFile.json="$BOUND_JSON"
+          ) 2>&1 | tee "$EVIDENCE_DIR/base-test.log"
+          base_pipeline=("${PIPESTATUS[@]}")
+          base_rc="${base_pipeline[0]}"
+          if test "$base_rc" -eq 0; then base_rc="${base_pipeline[1]}"; fi
+          printf '%s\n' "$base_rc" > "$EVIDENCE_DIR/base-test.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/base-test.ended"
+          capture_resources base-after
+
+          capture_resources p2-before
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/p2-test.started"
+          (
+            cd "$P2_DIR"
+            BOUND_JSON="$EVIDENCE_DIR/p2-test.vitest.json"
+            GITHUB_WORKSPACE="$P2_DIR" /usr/bin/time -v -o "$EVIDENCE_DIR/p2-test.time" \
+              node scripts/run-vitest.mjs run \
+                --config test/vitest/vitest.gateway-server.config.ts \
+                src/gateway/server.auth.trusted-proxy-device-autoapprove.test.ts \
+                --reporter=verbose \
+                --reporter=json \
+                --outputFile.json="$BOUND_JSON"
+          ) 2>&1 | tee "$EVIDENCE_DIR/p2-test.log"
+          p2_pipeline=("${PIPESTATUS[@]}")
+          p2_rc="${p2_pipeline[0]}"
+          if test "$p2_rc" -eq 0; then p2_rc="${p2_pipeline[1]}"; fi
+          printf '%s\n' "$p2_rc" > "$EVIDENCE_DIR/p2-test.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/p2-test.ended"
+          capture_resources p2-after
+          set -e
+
+          set +e
+          EVIDENCE_DIR="$EVIDENCE_DIR" TARGET_FILE="$TARGET_FILE" TARGET_NAME="$TARGET_NAME" python3 - 2>&1 <<'PY' | tee "$EVIDENCE_DIR/attribution-validator.log"
+          import json
+          import os
+          import re
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          expected_file = os.environ["TARGET_FILE"]
+          expected_name = os.environ["TARGET_NAME"]
+          expected_names = [
+              "trusted-proxy browser device auto-approval auto-approves operator.admin and warns once at startup",
+              "trusted-proxy browser device auto-approval auto-approves a new browser device with the default scopes",
+              "trusted-proxy browser device auto-approval caps requested scopes to the configured intersection",
+              "trusted-proxy browser device auto-approval leaves mixed node and operator requests pending for manual approval",
+              "trusted-proxy browser device auto-approval caps omitted scopes to the declared proxy scopes",
+              "trusted-proxy browser device auto-approval caps requested scopes to the declared proxy scopes",
+              "trusted-proxy browser device auto-approval keeps configured and requested scope behavior when the proxy header is absent",
+              "trusted-proxy browser device auto-approval auto-approves same-key scope upgrades on existing devices",
+              "trusted-proxy browser device auto-approval rejects a foreign-key connect for an already-paired deviceId",
+              "trusted-proxy browser device auto-approval leaves trusted-proxy pairing unchanged when auto-approval is disabled",
+              "trusted-proxy browser device auto-approval does not auto-approve token-authenticated browser devices",
+          ]
+          if len(expected_names) != 11 or len(set(expected_names)) != 11:
+              raise SystemExit("invalid frozen assertion-name contract")
+          if expected_name not in expected_names:
+              raise SystemExit("target assertion is not in the frozen 11-test contract")
+
+          def regular_file(path: Path) -> bool:
+              return path.is_file() and not path.is_symlink()
+
+          def read_exit(path: Path, errors: list[str]) -> int | None:
+              if not regular_file(path):
+                  errors.append(f"missing regular exit file: {path.name}")
+                  return None
+              try:
+                  value = int(path.read_text(encoding="utf-8").strip())
+              except (OSError, ValueError) as exc:
+                  errors.append(f"invalid exit file {path.name}: {exc}")
+                  return None
+              if value < 0:
+                  errors.append(f"negative exit code in {path.name}")
+                  return None
+              return value
+
+          def read_utc(path: Path, errors: list[str]) -> datetime | None:
+              if not regular_file(path):
+                  errors.append(f"missing regular UTC file: {path.name}")
+                  return None
+              text = path.read_text(encoding="utf-8").strip()
+              if re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", text) is None:
+                  errors.append(f"invalid UTC timestamp in {path.name}: {text!r}")
+                  return None
+              try:
+                  return datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+              except ValueError as exc:
+                  errors.append(f"invalid UTC timestamp in {path.name}: {exc}")
+                  return None
+
+          def validate_interval(stem: str, errors: list[str]) -> tuple[datetime | None, datetime | None]:
+              started = read_utc(evidence / f"{stem}.started", errors)
+              ended = read_utc(evidence / f"{stem}.ended", errors)
+              if started is not None and ended is not None and started > ended:
+                  errors.append(f"UTC interval inverted for {stem}")
+              return started, ended
+
+          def validate_resource(label: str, errors: list[str]) -> dict:
+              started, ended = validate_interval(label, errors)
+              exit_code = read_exit(evidence / f"{label}.exit", errors)
+              if exit_code != 0:
+                  errors.append(f"resource capture {label} exit must be 0")
+              path = evidence / f"{label}.resources.txt"
+              if not regular_file(path):
+                  errors.append(f"missing regular resource file: {path.name}")
+                  return {"exitCode": exit_code}
+              text = path.read_text(encoding="utf-8", errors="replace")
+              captured_match = re.search(r"^captured_at_utc=(.+)$", text, re.MULTILINE)
+              captured = None
+              if captured_match is None:
+                  errors.append(f"missing captured_at_utc marker: {label}")
+              else:
+                  captured_text = captured_match.group(1)
+                  if re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", captured_text) is None:
+                      errors.append(f"invalid captured_at_utc marker: {label}")
+                  else:
+                      try:
+                          captured = datetime.strptime(
+                              captured_text, "%Y-%m-%dT%H:%M:%SZ"
+                          ).replace(tzinfo=timezone.utc)
+                      except ValueError:
+                          errors.append(f"invalid captured_at_utc value: {label}")
+              nproc_match = re.search(r"^nproc=(\d+)$", text, re.MULTILINE)
+              if nproc_match is None or int(nproc_match.group(1)) <= 0:
+                  errors.append(f"missing positive nproc marker: {label}")
+              for marker in ["[df]", "Filesystem", "[meminfo]", "MemTotal:", "MemAvailable:"]:
+                  if marker not in text:
+                      errors.append(f"missing resource marker {marker!r}: {label}")
+              for pressure in ["cpu", "memory", "io"]:
+                  marker = f"[psi:{pressure}]"
+                  if marker not in text:
+                      errors.append(f"missing resource marker {marker!r}: {label}")
+              if captured is not None and started is not None and captured < started:
+                  errors.append(f"captured_at_utc precedes start: {label}")
+              if captured is not None and ended is not None and captured > ended:
+                  errors.append(f"captured_at_utc follows end: {label}")
+              return {"exitCode": exit_code}
+
+          def nonnegative_int(report: dict, key: str, errors: list[str]) -> int | None:
+              value = report.get(key)
+              if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                  errors.append(f"{key} must be a nonnegative integer")
+                  return None
+              return value
+
+          def parse_side(side: str) -> dict:
+              report_path = evidence / f"{side}-test.vitest.json"
+              exit_path = evidence / f"{side}-test.exit"
+              errors: list[str] = []
+              before_resource = validate_resource(f"{side}-before", errors)
+              after_resource = validate_resource(f"{side}-after", errors)
+              validate_interval(f"{side}-test", errors)
+              if not regular_file(report_path):
+                  return {"status": "UNKNOWN", "exitCode": None, "errors": ["missing regular JSON report"]}
+              exit_code = read_exit(exit_path, errors)
+              try:
+                  report = json.loads(report_path.read_text(encoding="utf-8"))
+              except (json.JSONDecodeError, OSError) as exc:
+                  return {"status": "UNKNOWN", "exitCode": None, "errors": [f"unreadable evidence: {exc}"]}
+
+              time_path = evidence / f"{side}-test.time"
+              time_exit = None
+              if not regular_file(time_path) or time_path.stat().st_size <= 0:
+                  errors.append(f"missing regular nonempty GNU time file: {time_path.name}")
+              else:
+                  time_text = time_path.read_text(encoding="utf-8", errors="replace")
+                  for marker in [
+                      "Command being timed:",
+                      "User time (seconds):",
+                      "System time (seconds):",
+                      "Elapsed (wall clock) time",
+                      "Maximum resident set size (kbytes):",
+                      "Exit status:",
+                  ]:
+                      if marker not in time_text:
+                          errors.append(f"missing GNU time marker {marker!r}: {side}")
+                  time_exit_match = re.search(r"^\s*Exit status:\s*(\d+)\s*$", time_text, re.MULTILINE)
+                  if time_exit_match is None:
+                      errors.append(f"invalid GNU time exit status: {side}")
+                  else:
+                      time_exit = int(time_exit_match.group(1))
+                      if exit_code is not None and time_exit != exit_code:
+                          errors.append(f"GNU time/test exit mismatch: {side}")
+
+              test_results = report.get("testResults")
+              if not isinstance(test_results, list) or len(test_results) != 1:
+                  errors.append("expected exactly one test file")
+                  assertions = []
+                  file_status = None
+                  file_name = None
+              else:
+                  file_status = test_results[0].get("status")
+                  file_name = test_results[0].get("name")
+                  normalized_file = file_name.replace("\\", "/") if isinstance(file_name, str) else ""
+                  if normalized_file != expected_file and not normalized_file.endswith(f"/{expected_file}"):
+                      errors.append(f"unexpected test file: {file_name!r}")
+                  assertions = test_results[0].get("assertionResults")
+                  if not isinstance(assertions, list):
+                      assertions = []
+              allowed_statuses = {"passed", "failed"}
+              unexpected_statuses = sorted(
+                  {str(item.get("status")) for item in assertions if item.get("status") not in allowed_statuses}
+              )
+              if unexpected_statuses:
+                  errors.append(f"skipped, pending, todo, or unknown assertions: {unexpected_statuses!r}")
+              executed = [item for item in assertions if item.get("status") in {"passed", "failed"}]
+              if len(assertions) != 11 or len(executed) != 11:
+                  errors.append("expected exactly 11 executed assertions")
+              full_names = [item.get("fullName") for item in assertions]
+              if any(not isinstance(name, str) for name in full_names):
+                  errors.append("every assertion must have a string fullName")
+              elif sorted(full_names) != sorted(expected_names):
+                  errors.append("assertion fullNames do not match the frozen 11-test contract")
+              if len(set(full_names)) != len(full_names):
+                  errors.append("duplicate assertion fullName")
+              target_assertions = [item for item in assertions if item.get("fullName") == expected_name]
+              if len(target_assertions) != 1:
+                  errors.append("expected exactly one concrete target assertion")
+              target_assertion = target_assertions[0] if len(target_assertions) == 1 else {}
+              target_status = target_assertion.get("status")
+              if target_status not in {"passed", "failed"}:
+                  errors.append(f"target assertion is skipped or unknown: {target_status!r}")
+
+              counts = {
+                  key: nonnegative_int(report, key, errors)
+                  for key in [
+                      "numTotalTests", "numPassedTests", "numFailedTests",
+                      "numPendingTests", "numTodoTests", "numTotalTestSuites",
+                      "numPassedTestSuites", "numFailedTestSuites", "numPendingTestSuites",
+                  ]
+              }
+              if counts["numTotalTests"] is not None and counts["numTotalTests"] != len(assertions):
+                  errors.append("numTotalTests must equal assertionResults length")
+              assertion_counts = {
+                  "passed": sum(item.get("status") == "passed" for item in assertions),
+                  "failed": sum(item.get("status") == "failed" for item in assertions),
+                  "pending": sum(item.get("status") in {"skipped", "pending"} for item in assertions),
+                  "todo": sum(item.get("status") == "todo" for item in assertions),
+              }
+              for report_key, assertion_key in [
+                  ("numPassedTests", "passed"),
+                  ("numFailedTests", "failed"),
+                  ("numPendingTests", "pending"),
+                  ("numTodoTests", "todo"),
+              ]:
+                  if counts[report_key] is not None and counts[report_key] != assertion_counts[assertion_key]:
+                      errors.append(f"{report_key} does not match assertionResults")
+              if all(counts[key] is not None for key in [
+                  "numTotalTests", "numPassedTests", "numFailedTests", "numPendingTests", "numTodoTests"
+              ]):
+                  component_total = (
+                      counts["numPassedTests"] + counts["numFailedTests"]
+                      + counts["numPendingTests"] + counts["numTodoTests"]
+                  )
+                  if component_total != counts["numTotalTests"]:
+                      errors.append("test result category counts must equal numTotalTests")
+              if all(counts[key] is not None for key in [
+                  "numTotalTestSuites", "numPassedTestSuites", "numFailedTestSuites", "numPendingTestSuites"
+              ]):
+                  suite_total = (
+                      counts["numPassedTestSuites"] + counts["numFailedTestSuites"]
+                      + counts["numPendingTestSuites"]
+                  )
+                  if counts["numTotalTestSuites"] <= 0 or suite_total != counts["numTotalTestSuites"]:
+                      errors.append("suite counts must be positive and coherent")
+              report_success = report.get("success")
+              if not isinstance(report_success, bool):
+                  errors.append("report.success must be boolean")
+
+              pass_contract = (
+                  report_success is True
+                  and file_status == "passed"
+                  and counts["numTotalTestSuites"] is not None
+                  and counts["numTotalTestSuites"] > 0
+                  and counts["numPassedTestSuites"] == counts["numTotalTestSuites"]
+                  and counts["numFailedTestSuites"] == 0
+                  and counts["numPendingTestSuites"] == 0
+                  and target_status == "passed"
+                  and assertion_counts["passed"] == 11
+                  and assertion_counts["failed"] == 0
+                  and assertion_counts["pending"] == 0
+                  and assertion_counts["todo"] == 0
+                  and exit_code == 0
+              )
+              fail_contract = (
+                  report_success is False
+                  and file_status == "failed"
+                  and counts["numTotalTestSuites"] is not None
+                  and counts["numTotalTestSuites"] > 0
+                  and counts["numPassedTestSuites"] is not None
+                  and counts["numFailedTestSuites"] is not None
+                  and counts["numPassedTestSuites"] + counts["numFailedTestSuites"]
+                      == counts["numTotalTestSuites"]
+                  and counts["numFailedTestSuites"] > 0
+                  and counts["numPendingTestSuites"] == 0
+                  and target_status in {"passed", "failed"}
+                  and assertion_counts["passed"] + assertion_counts["failed"] == 11
+                  and assertion_counts["failed"] > 0
+                  and assertion_counts["pending"] == 0
+                  and assertion_counts["todo"] == 0
+                  and exit_code is not None
+                  and exit_code != 0
+              )
+              if not errors and pass_contract:
+                  status = "PASS"
+              elif not errors and fail_contract:
+                  status = "FAIL"
+              else:
+                  if not errors:
+                      errors.append("report/file/suite/assertion/exit contract is inconsistent")
+                  status = "UNKNOWN"
+              return {
+                  "status": status,
+                  "exitCode": exit_code,
+                  "targetFullName": expected_name,
+                  "targetStatus": target_status,
+                  "fullNames": full_names,
+                  "file": file_name,
+                  "fileStatus": file_status,
+                  "reportSuccess": report_success,
+                  "counts": counts,
+                  "assertionCounts": assertion_counts,
+                  "timeExitCode": time_exit,
+                  "resources": {"before": before_resource, "after": after_resource},
+                  "errors": errors,
+              }
+
+          base = parse_side("base")
+          p2 = parse_side("p2")
+          statuses = (base["status"], p2["status"])
+          attribution = {
+              ("PASS", "PASS"): "BOTH_PASS",
+              ("PASS", "FAIL"): "BASE_PASS_P2_FAIL",
+              ("FAIL", "PASS"): "BASE_FAIL_P2_PASS",
+              ("FAIL", "FAIL"): "BOTH_FAIL",
+          }.get(statuses, "UNKNOWN")
+          result = {
+              "schema": "openclaw.gateway-r7-trusted-proxy-attribution.v1",
+              "attribution": attribution,
+              "complete": attribution != "UNKNOWN",
+              "base": base,
+              "p2": p2,
+          }
+          (evidence / "attribution.json").write_text(
+              json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(result, sort_keys=True))
+          sys.exit(0 if result["complete"] else 1)
+          PY
+          validator_pipeline=("${PIPESTATUS[@]}")
+          validator_rc="${validator_pipeline[0]}"
+          if test "$validator_rc" -eq 0; then validator_rc="${validator_pipeline[1]}"; fi
+          set -e
+          printf '%s\n' "$validator_rc" > "$EVIDENCE_DIR/attribution-validator.exit"
+
+          pair_rc=1
+          if test "$validator_rc" -eq 0 \
+            && test "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["attribution"])' "$EVIDENCE_DIR/attribution.json")" = "BOTH_PASS"; then
+            pair_rc=0
+          fi
+          printf '%s\n' "$pair_rc" > "$EVIDENCE_DIR/attribution-pair.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/attribution-pair.ended"
+          exit "$pair_rc"
+
+      - name: Guard final Base and P2 poststate
+        id: poststate
+        if: always()
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/poststate.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(git -C "$BASE_DIR" rev-parse HEAD)" = "$BASE_SHA"
+            test "$(git -C "$BASE_DIR" rev-parse HEAD^{tree})" = "$BASE_TREE"
+            test "$(git -C "$P2_DIR" rev-parse HEAD)" = "$P2_SHA"
+            test "$(git -C "$P2_DIR" rev-parse HEAD^{tree})" = "$P2_TREE"
+            test "$(git -C "$P2_DIR" rev-parse HEAD^)" = "$P_SHA"
+            test "$(git -C "$P2_DIR" rev-parse HEAD^^)" = "$BASE_SHA"
+            test -z "$(git -C "$BASE_DIR" status --porcelain=v1 --untracked-files=all)"
+            test -z "$(git -C "$P2_DIR" status --porcelain=v1 --untracked-files=all)"
+          ) > "$EVIDENCE_DIR/poststate.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/poststate.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/poststate.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/poststate.ended"
+          exit "$rc"
+
+      - name: Finalize attribution manifest
+        id: finalize
+        if: always()
+        shell: bash
+        timeout-minutes: 5
+        env:
+          EVENT_H_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUNNER_NAME_VALUE: ${{ runner.name }}
+          RUNNER_ENVIRONMENT_VALUE: ${{ runner.environment }}
+          RUNNER_OS_VALUE: ${{ runner.os }}
+          RUNNER_ARCH_VALUE: ${{ runner.arch }}
+          INITIALIZE_OUTCOME: ${{ steps.initialize.outcome }}
+          CHECKOUT_H_OUTCOME: ${{ steps.checkout_h.outcome }}
+          HARNESS_GUARD_OUTCOME: ${{ steps.harness_guard.outcome }}
+          CHECKOUT_BASE_OUTCOME: ${{ steps.checkout_base.outcome }}
+          CHECKOUT_P2_OUTCOME: ${{ steps.checkout_p2.outcome }}
+          SOURCE_GUARD_OUTCOME: ${{ steps.source_guard.outcome }}
+          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
+          TOOLING_OUTCOME: ${{ steps.tooling.outcome }}
+          DISK_GUARD_OUTCOME: ${{ steps.disk_guard.outcome }}
+          INSTALL_PAIR_OUTCOME: ${{ steps.install_pair.outcome }}
+          ATTRIBUTION_PAIR_OUTCOME: ${{ steps.attribution_pair.outcome }}
+          POSTSTATE_OUTCOME: ${{ steps.poststate.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/finalize.started"
+          set +e
+          python3 - 2>&1 <<'PY' | tee "$EVIDENCE_DIR/finalize.log"
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import subprocess
+          from datetime import datetime, timezone
+
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          harness = pathlib.Path(os.environ["HARNESS_DIR"])
+
+          def read_text(name: str, fallback: str | None = None) -> str | None:
+              path = evidence / name
+              return path.read_text(encoding="utf-8").strip() if path.is_file() else fallback
+
+          def git_value(repo: pathlib.Path, *args: str) -> str | None:
+              if not (repo / ".git").exists():
+                  return None
+              result = subprocess.run(
+                  ["git", "-C", str(repo), *args], check=False, capture_output=True, text=True
+              )
+              return result.stdout.strip() if result.returncode == 0 else None
+
+          def normalized(value: str) -> str:
+              return "NOT_RUN" if value in {"", "skipped"} else value.upper()
+
+          def exit_code(name: str, status: str) -> int | str:
+              value = read_text(f"{name}.exit")
+              if value is not None:
+                  try:
+                      return int(value)
+                  except ValueError:
+                      return "INVALID"
+              if status == "SUCCESS":
+                  return 0
+              if status == "NOT_RUN":
+                  return "NOT_RUN"
+              return "UNKNOWN_NONZERO"
+
+          outcome_env = {
+              "initialize": "INITIALIZE_OUTCOME",
+              "checkout_h": "CHECKOUT_H_OUTCOME",
+              "harness_guard": "HARNESS_GUARD_OUTCOME",
+              "checkout_base": "CHECKOUT_BASE_OUTCOME",
+              "checkout_p2": "CHECKOUT_P2_OUTCOME",
+              "source_guard": "SOURCE_GUARD_OUTCOME",
+              "setup_node": "SETUP_NODE_OUTCOME",
+              "tooling": "TOOLING_OUTCOME",
+              "disk_guard": "DISK_GUARD_OUTCOME",
+              "install_pair": "INSTALL_PAIR_OUTCOME",
+              "attribution_pair": "ATTRIBUTION_PAIR_OUTCOME",
+              "poststate": "POSTSTATE_OUTCOME",
+          }
+          file_stem = {
+              "harness_guard": "harness-guard",
+              "checkout_base": "checkout-base",
+              "checkout_p2": "checkout-p2",
+              "source_guard": "source-guard",
+              "setup_node": "setup-node",
+              "disk_guard": "disk-guard",
+              "install_pair": "install-pair",
+              "attribution_pair": "attribution-pair",
+          }
+          steps = {}
+          for name, key in outcome_env.items():
+              status = normalized(os.environ.get(key, ""))
+              stem = file_stem.get(name, name.replace("_", "-"))
+              steps[name] = {
+                  "status": status,
+                  "exitCode": exit_code(stem, status),
+                  "startedAt": read_text(f"{stem}.started"),
+                  "endedAt": read_text(f"{stem}.ended"),
+              }
+          attribution_path = evidence / "attribution.json"
+          attribution = (
+              json.loads(attribution_path.read_text(encoding="utf-8"))
+              if attribution_path.is_file()
+              else {"attribution": "UNKNOWN", "complete": False}
+          )
+          runner_complete = (
+              os.environ["RUNNER_ENVIRONMENT_VALUE"] == "github-hosted"
+              and os.environ["RUNNER_OS_VALUE"] == "Linux"
+              and os.environ["RUNNER_ARCH_VALUE"] == "X64"
+              and bool(os.environ.get("ImageOS"))
+              and bool(os.environ.get("ImageVersion"))
+          )
+          prerequisites = [
+              "initialize", "checkout_h", "harness_guard", "checkout_base", "checkout_p2",
+              "source_guard", "setup_node", "tooling", "disk_guard", "install_pair",
+              "poststate",
+          ]
+          both_pass = (
+              attribution.get("attribution") == "BOTH_PASS"
+              and attribution.get("complete") is True
+              and all(steps[name]["status"] == "SUCCESS" for name in prerequisites)
+              and steps["attribution_pair"]["status"] == "SUCCESS"
+              and runner_complete
+          )
+          final_status = {
+              "status": "PASS" if both_pass else "FAIL",
+              "exit": 0 if both_pass else 1,
+              "attribution": attribution.get("attribution", "UNKNOWN"),
+              "complete": attribution.get("complete", False),
+          }
+          (evidence / "finalstatus.json").write_text(
+              json.dumps(final_status, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          workflow_file = harness / os.environ["WORKFLOW_PATH"]
+          manifest = {
+              "schema": "openclaw.gateway-r7-trusted-proxy-attribution-manifest.v1",
+              "repository": os.environ["EXPECTED_REPOSITORY"],
+              "harness": {
+                  "commit": os.environ["EVENT_H_SHA"],
+                  "tree": git_value(harness, "rev-parse", f"{os.environ['EVENT_H_SHA']}^{{tree}}"),
+                  "parent": os.environ["P2_SHA"],
+                  "workflowPath": os.environ["WORKFLOW_PATH"],
+                  "workflowBlobSha": git_value(
+                      harness, "rev-parse", f"{os.environ['EVENT_H_SHA']}:{os.environ['WORKFLOW_PATH']}"
+                  ),
+                  "workflowContentSha256": (
+                      hashlib.sha256(workflow_file.read_bytes()).hexdigest()
+                      if workflow_file.is_file() else None
+                  ),
+              },
+              "source": {
+                  "base": {"commit": os.environ["BASE_SHA"], "tree": os.environ["BASE_TREE"]},
+                  "predecessor": {"commit": os.environ["P_SHA"], "tree": os.environ["P_TREE"]},
+                  "p2": {"commit": os.environ["P2_SHA"], "tree": os.environ["P2_TREE"]},
+                  "baseToP2FullIndexDiffSha256": os.environ["CUMULATIVE_DIFF_SHA256"],
+                  "testBlobSha": os.environ["TEST_BLOB_SHA"],
+                  "gatewayServerConfigBlobSha": os.environ["GATEWAY_SERVER_CONFIG_BLOB_SHA"],
+                  "timeoutContractBlobSha": os.environ["TIMEOUT_CONTRACT_BLOB_SHA"],
+              },
+              "target": {"file": os.environ["TARGET_FILE"], "fullName": os.environ["TARGET_NAME"]},
+              "commands": {
+                  "baseInstall": "pnpm install --frozen-lockfile --store-dir $BASE_STORE_DIR",
+                  "p2Install": "pnpm install --frozen-lockfile --store-dir $P2_STORE_DIR",
+                  "test": (
+                      "BOUND_JSON=<bound-report> GITHUB_WORKSPACE=<bound-checkout> "
+                      "/usr/bin/time -v -o <bound-time> node scripts/run-vitest.mjs run "
+                      "--config test/vitest/vitest.gateway-server.config.ts "
+                      "src/gateway/server.auth.trusted-proxy-device-autoapprove.test.ts "
+                      "--reporter=verbose --reporter=json --outputFile.json=$BOUND_JSON"
+                  ),
+              },
+              "run": {
+                  "id": os.environ["RUN_ID"],
+                  "attempt": int(os.environ["RUN_ATTEMPT"]),
+                  "event": os.environ["EVENT_NAME"],
+                  "ref": os.environ["EVENT_REF"],
+                  "url": f"https://github.com/{os.environ['EXPECTED_REPOSITORY']}/actions/runs/{os.environ['RUN_ID']}",
+                  "startedAt": read_text("job.started"),
+                  "endedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              },
+              "runner": {
+                  "name": os.environ["RUNNER_NAME_VALUE"],
+                  "environment": os.environ["RUNNER_ENVIRONMENT_VALUE"],
+                  "os": os.environ["RUNNER_OS_VALUE"],
+                  "arch": os.environ["RUNNER_ARCH_VALUE"],
+                  "imageOS": os.environ.get("ImageOS"),
+                  "imageVersion": os.environ.get("ImageVersion"),
+              },
+              "toolchain": {
+                  "node": read_text("node.version.txt", "NOT_RUN"),
+                  "pnpm": read_text("pnpm.version.txt", "NOT_RUN"),
+                  "packageManager": read_text("package-manager.txt", "NOT_RUN"),
+              },
+              "steps": steps,
+              "attribution": attribution,
+              "final": final_status,
+          }
+          (evidence / "manifest.partial.json").write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(final_status, sort_keys=True))
+          PY
+          pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          rc="${pipeline_status[0]}"
+          if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/finalize.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/finalize.ended"
+          exit "$rc"
+
+      - name: Seal evidence hashes
+        id: seal
+        if: always()
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          partial = evidence / "manifest.partial.json"
+          if not partial.is_file() or partial.is_symlink():
+              raise SystemExit("missing regular partial manifest")
+          manifest = json.loads(partial.read_text(encoding="utf-8"))
+          forbidden = [path.name for path in evidence.iterdir() if path.is_symlink()]
+          if forbidden:
+              raise SystemExit(f"symlink evidence forbidden: {forbidden!r}")
+          required_complete = {
+              "base-test.log", "base-test.time", "base-test.vitest.json", "base-test.exit",
+              "base-test.started", "base-test.ended",
+              "p2-test.log", "p2-test.time", "p2-test.vitest.json", "p2-test.exit",
+              "p2-test.started", "p2-test.ended",
+              "base-before.resources.txt", "base-before.started", "base-before.ended", "base-before.exit",
+              "base-after.resources.txt", "base-after.started", "base-after.ended", "base-after.exit",
+              "p2-before.resources.txt", "p2-before.started", "p2-before.ended", "p2-before.exit",
+              "p2-after.resources.txt", "p2-after.started", "p2-after.ended", "p2-after.exit",
+              "attribution-validator.log", "attribution-validator.exit", "attribution.json",
+              "attribution-pair.started", "attribution-pair.ended", "attribution-pair.exit",
+          }
+          if manifest["attribution"].get("complete") is True:
+              missing = sorted(
+                  name
+                  for name in required_complete
+                  if not (evidence / name).is_file() or (evidence / name).is_symlink()
+              )
+              if missing:
+                  raise SystemExit(f"complete attribution missing evidence: {missing!r}")
+
+              def read_utc(name: str) -> datetime:
+                  text = (evidence / name).read_text(encoding="utf-8").strip()
+                  if re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", text) is None:
+                      raise SystemExit(f"invalid attribution UTC timestamp: {name}")
+                  return datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+
+              for stem in [
+                  "base-before", "base-test", "base-after", "p2-before", "p2-test", "p2-after",
+                  "attribution-pair",
+              ]:
+                  if read_utc(f"{stem}.started") > read_utc(f"{stem}.ended"):
+                      raise SystemExit(f"attribution UTC interval inverted: {stem}")
+          required_pass = required_complete | {
+              "initialize.log", "initialize.exit", "harness-guard.log", "harness-guard.exit",
+              "source-guard.log", "source-guard.exit", "tooling.log", "tooling.exit",
+              "disk-guard.log", "disk-guard.exit", "base-install.log", "base-install.exit",
+              "p2-install.log", "p2-install.exit", "install-pair.exit", "poststate.log",
+              "poststate.exit", "node.version.txt", "pnpm.version.txt", "package-manager.txt",
+              "poststate.started", "poststate.ended", "finalstatus.json", "finalize.log",
+              "finalize.started", "finalize.ended", "finalize.exit",
+          }
+          if manifest["final"].get("status") == "PASS":
+              missing = sorted(
+                  name
+                  for name in required_pass
+                  if not (evidence / name).is_file() or (evidence / name).is_symlink()
+              )
+              if missing:
+                  raise SystemExit(f"PASS attribution missing evidence: {missing!r}")
+              expected_zero_exits = [
+                  "initialize.exit", "harness-guard.exit", "source-guard.exit", "tooling.exit",
+                  "disk-guard.exit", "base-install.exit", "p2-install.exit", "install-pair.exit",
+                  "base-before.exit", "base-test.exit", "base-after.exit",
+                  "p2-before.exit", "p2-test.exit", "p2-after.exit",
+                  "attribution-validator.exit", "attribution-pair.exit", "poststate.exit",
+                  "finalize.exit",
+              ]
+              nonzero = []
+              for name in expected_zero_exits:
+                  try:
+                      value = int((evidence / name).read_text(encoding="utf-8").strip())
+                  except (OSError, ValueError):
+                      value = None
+                  if value != 0:
+                      nonzero.append({"file": name, "value": value})
+              if nonzero:
+                  raise SystemExit(f"PASS exit contract mismatch: {nonzero!r}")
+
+              for stem in ["poststate", "finalize"]:
+                  if read_utc(f"{stem}.started") > read_utc(f"{stem}.ended"):
+                      raise SystemExit(f"PASS UTC interval inverted: {stem}")
+          excluded = {"manifest.partial.json", "manifest.json"}
+          files = sorted(
+              [path for path in evidence.iterdir() if path.is_file() and path.name not in excluded],
+              key=lambda path: path.name,
+          )
+          hashes = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in files}
+          manifest["filesSha256"] = hashes
+          manifest_path = evidence / "manifest.json"
+          manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          partial.unlink()
+          for name, expected in hashes.items():
+              actual = hashlib.sha256((evidence / name).read_bytes()).hexdigest()
+              if actual != expected:
+                  raise SystemExit(f"evidence hash drift: {name}")
+          print(json.dumps({"sealedFiles": len(hashes), "manifest": manifest_path.name}, sort_keys=True))
+          PY
+
+      - name: Upload attribution evidence
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: r7-trusted-proxy-b1-435e341a-7492177a-${{ github.run_id }}-attempt-1
+          path: |
+            ${{ runner.temp }}/r7-trusted-proxy-attribution/*.log
+            ${{ runner.temp }}/r7-trusted-proxy-attribution/*.json
+            ${{ runner.temp }}/r7-trusted-proxy-attribution/*.txt
+            ${{ runner.temp }}/r7-trusted-proxy-attribution/*.time
+            ${{ runner.temp }}/r7-trusted-proxy-attribution/*.started
+            ${{ runner.temp }}/r7-trusted-proxy-attribution/*.ended
+            ${{ runner.temp }}/r7-trusted-proxy-attribution/*.exit
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
