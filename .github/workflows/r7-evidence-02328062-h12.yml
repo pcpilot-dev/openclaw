@@ -1,0 +1,2389 @@
+name: Gateway r7 P2 H12 Shard-Native Heavy Proof · P2 7492177a7068ca7481dd355f37b2d7a21630e9bc
+run-name: Gateway r7 P2 H12 · SHARD_NATIVE_SUBSTITUTE · run ${{ github.run_id }} attempt ${{ github.run_attempt }}
+
+on:
+  push:
+    branches:
+      - codex/evidence-gateway-r7-02328062-h12
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r7-evidence-02328062-h12
+  cancel-in-progress: false
+
+env:
+  BASE_SHA: 435e341a6ccd3db1f0d07504931f32385d10d6df
+  BASE_TREE: 916f825917a49da59c180a4cdabec3f0ce08227e
+  P_SHA: 7b89bf143d3c63e916847d58b92b5727fc16e4ca
+  P_TREE: 5f9eef5fd0c3e496910e2b3ab9db31023a43ca94
+  P2_SHA: 7492177a7068ca7481dd355f37b2d7a21630e9bc
+  P2_TREE: 39349f53cf8b6e5fbed55c8769ed5e5905965894
+  EXPECTED_REPOSITORY: pcpilot-dev/openclaw
+  EXPECTED_REF: refs/heads/codex/evidence-gateway-r7-02328062-h12
+  WORKFLOW_PATH: .github/workflows/r7-evidence-02328062-h12.yml
+  INCREMENTAL_DIFF_SHA256: 774166385d059a88d7333069d5990b6628bff8b5c15408796503c36f6a604e48
+  CUMULATIVE_DIFF_SHA256: 0232806223e4a84de70ad1a6901d9e537cc081fe2043454c0dfaf1a425b0b8d0
+  PACKAGE_BLOB_SHA: f63ea7030f84032ec3021b3459084655dd584e9a
+  LOCK_BLOB_SHA: e9940a0c1404b1b6c584701351a93282f12bab77
+  SHARDS_BLOB_SHA: 7b0154d3cb15713b2ee138c5b15fddfecb6ca1fc
+  TIMEOUTS_BLOB_SHA: 5816139df0ac52117d330775267298a08082017a
+  SHARED_CONFIG_BLOB_SHA: 9c5342e3498633bc72a29b9639ac620b799f73f9
+  RUN_VITEST_BLOB_SHA: 4f8b6d1abd0c94016f6c5f56f05ce219e8d9dfaa
+  EXPECTED_PACKAGE_MANAGER: pnpm@11.15.1+sha512.81350b07e53c9538a02f1f2303b4290fa2d7be04e56e2a970c4cc4b417dc761de196edabd49d55c7dc9580db81007c44143e4e3d7e462b3000d23c255122d065
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+  OPENCLAW_VITEST_MAX_WORKERS: "2"
+
+jobs:
+  guard:
+    name: H12 event, harness, and P2 identity guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      workflow_blob: ${{ steps.identity.outputs.workflow_blob }}
+      workflow_content_sha256: ${{ steps.identity.outputs.workflow_content_sha256 }}
+    steps:
+      - name: Checkout event harness H12
+        id: checkout_h
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ github.event.after }}
+          path: harness
+          fetch-depth: 2
+          persist-credentials: false
+          clean: true
+      - name: Checkout detached payload P2
+        id: checkout_p2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: 7492177a7068ca7481dd355f37b2d7a21630e9bc
+          path: candidate
+          fetch-depth: 3
+          persist-credentials: false
+          clean: true
+      - name: Enforce event, harness, and full source contract
+        id: identity
+        shell: bash
+        timeout-minutes: 8
+        env:
+          EVENT_AFTER: ${{ github.event.after }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_REPOSITORY: ${{ github.repository }}
+          EVENT_H_SHA: ${{ github.sha }}
+          WORKFLOW_H_SHA: ${{ github.workflow_sha }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUNNER_ENVIRONMENT_VALUE: ${{ runner.environment }}
+          RUNNER_OS_VALUE: ${{ runner.os }}
+          RUNNER_ARCH_VALUE: ${{ runner.arch }}
+          HARNESS_DIR: ${{ github.workspace }}/harness
+          CANDIDATE_DIR: ${{ github.workspace }}/candidate
+        run: |
+          set -euo pipefail
+          test "$EVENT_NAME" = "push"
+          test "$EVENT_REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$EVENT_REF" = "$EXPECTED_REF"
+          test "$RUN_ATTEMPT" = "1"
+          test "$EVENT_AFTER" = "$EVENT_H_SHA"
+          test "$EVENT_AFTER" = "$WORKFLOW_H_SHA"
+          test "$EVENT_AFTER" != "0000000000000000000000000000000000000000"
+          test "$RUNNER_ENVIRONMENT_VALUE" = "github-hosted"
+          test "$RUNNER_OS_VALUE" = "Linux"
+          test "$RUNNER_ARCH_VALUE" = "X64"
+          test -n "${ImageOS:-}"
+          test -n "${ImageVersion:-}"
+          test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$EVENT_AFTER"
+          read -r -a harness_parents <<< "$(git -C "$HARNESS_DIR" rev-list --parents -n 1 "$EVENT_AFTER")"
+          test "${#harness_parents[@]}" -eq 2
+          test "${harness_parents[0]}" = "$EVENT_AFTER"
+          test "${harness_parents[1]}" = "$P2_SHA"
+          mapfile -t harness_paths < <(git -C "$HARNESS_DIR" diff-tree --no-commit-id --name-only -r "$EVENT_AFTER")
+          test "${#harness_paths[@]}" -eq 1
+          test "${harness_paths[0]}" = "$WORKFLOW_PATH"
+          test -f "$HARNESS_DIR/$WORKFLOW_PATH"
+          test ! -L "$HARNESS_DIR/$WORKFLOW_PATH"
+          test -z "$(git -C "$HARNESS_DIR" status --porcelain=v1 --untracked-files=no)"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD)" = "$P2_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^{tree})" = "$P2_TREE"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^)" = "$P_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^^)" = "$BASE_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA^{tree}")" = "$P_TREE"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA^{tree}")" = "$BASE_TREE"
+          read -r -a p2_parents <<< "$(git -C "$CANDIDATE_DIR" rev-list --parents -n 1 "$P2_SHA")"
+          test "${#p2_parents[@]}" -eq 2
+          test "${p2_parents[0]}" = "$P2_SHA"
+          test "${p2_parents[1]}" = "$P_SHA"
+          read -r -a p_parents <<< "$(git -C "$CANDIDATE_DIR" rev-list --parents -n 1 "$P_SHA")"
+          test "${#p_parents[@]}" -eq 2
+          test "${p_parents[0]}" = "$P_SHA"
+          test "${p_parents[1]}" = "$BASE_SHA"
+          if git -C "$CANDIDATE_DIR" symbolic-ref -q HEAD; then exit 1; fi
+          test -z "$(git -C "$CANDIDATE_DIR" status --porcelain=v1 --untracked-files=no)"
+          incremental_expected="$RUNNER_TEMP/h12-incremental.expected"
+          incremental_actual="$RUNNER_TEMP/h12-incremental.actual"
+          printf '%s\n' \
+            src/auto-reply/reply/model-selection-catalog-loader.ts \
+            src/auto-reply/reply/model-selection.ts \
+            src/gateway/server-methods/models-list-auth-resolver.ts \
+            src/gateway/server-methods/models-list-result.ts \
+            src/gateway/server-model-catalog.test.ts \
+            | LC_ALL=C sort > "$incremental_expected"
+          git -C "$CANDIDATE_DIR" diff --name-only "$P_SHA" "$P2_SHA" | LC_ALL=C sort > "$incremental_actual"
+          diff -u "$incremental_expected" "$incremental_actual"
+          read -r ii id ifiles <<< "$(git -C "$CANDIDATE_DIR" diff --numstat "$P_SHA" "$P2_SHA" | awk 'BEGIN { i=0; d=0; f=0 } { if ($1 == "-" || $2 == "-") exit 2; i += $1; d += $2; f += 1 } END { print i, d, f }')"
+          test "$ii" -eq 130
+          test "$id" -eq 94
+          test "$ifiles" -eq 5
+          git -C "$CANDIDATE_DIR" diff --check "$P_SHA" "$P2_SHA"
+          test "$(git -C "$CANDIDATE_DIR" diff --full-index --binary "$P_SHA" "$P2_SHA" | sha256sum | awk '{print $1}')" = "$INCREMENTAL_DIFF_SHA256"
+          cumulative_expected="$RUNNER_TEMP/h12-cumulative.expected"
+          cumulative_actual="$RUNNER_TEMP/h12-cumulative.actual"
+          printf '%s\n' \
+            src/agents/prepared-model-catalog.test.ts \
+            src/agents/prepared-model-catalog.ts \
+            src/auto-reply/reply/get-reply-directives.ts \
+            src/auto-reply/reply/get-reply.config-override.test.ts \
+            src/auto-reply/reply/get-reply.imports.test.ts \
+            src/auto-reply/reply/get-reply.ts \
+            src/auto-reply/reply/model-selection-catalog-loader.ts \
+            src/auto-reply/reply/model-selection.test.ts \
+            src/auto-reply/reply/model-selection.ts \
+            src/gateway/server-methods/models-list-auth-resolver.ts \
+            src/gateway/server-methods/models-list-result.ts \
+            src/gateway/server-model-catalog.test.ts \
+            | LC_ALL=C sort > "$cumulative_expected"
+          git -C "$CANDIDATE_DIR" diff --name-only "$BASE_SHA" "$P2_SHA" | LC_ALL=C sort > "$cumulative_actual"
+          diff -u "$cumulative_expected" "$cumulative_actual"
+          read -r ci cd cfiles <<< "$(git -C "$CANDIDATE_DIR" diff --numstat "$BASE_SHA" "$P2_SHA" | awk 'BEGIN { i=0; d=0; f=0 } { if ($1 == "-" || $2 == "-") exit 2; i += $1; d += $2; f += 1 } END { print i, d, f }')"
+          test "$ci" -eq 463
+          test "$cd" -eq 96
+          test "$cfiles" -eq 12
+          git -C "$CANDIDATE_DIR" diff --check "$BASE_SHA" "$P2_SHA"
+          test "$(git -C "$CANDIDATE_DIR" diff --full-index --binary "$BASE_SHA" "$P2_SHA" | sha256sum | awk '{print $1}')" = "$CUMULATIVE_DIFF_SHA256"
+          git -C "$CANDIDATE_DIR" diff --quiet "$BASE_SHA" "$P_SHA" -- package.json pnpm-lock.yaml
+          git -C "$CANDIDATE_DIR" diff --quiet "$P_SHA" "$P2_SHA" -- package.json pnpm-lock.yaml
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:test/vitest/vitest.test-shards.mjs")" = "$SHARDS_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:test/vitest/vitest.timeouts.ts")" = "$TIMEOUTS_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:test/vitest/vitest.shared.config.ts")" = "$SHARED_CONFIG_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:scripts/run-vitest.mjs")" = "$RUN_VITEST_BLOB_SHA"
+          test "$(node -p "require('$CANDIDATE_DIR/package.json').packageManager")" = "$EXPECTED_PACKAGE_MANAGER"
+          test "$(git -C "$CANDIDATE_DIR" show "$P2_SHA:test/vitest/vitest.timeouts.ts" | tr -d '[:space:]')" = "exportconstDEFAULT_VITEST_TEST_TIMEOUT_MS=120_000;"
+          if git -C "$CANDIDATE_DIR" rev-parse --verify 'refs/remotes/origin/main^{commit}' >/dev/null 2>&1; then exit 1; fi
+          git -C "$CANDIDATE_DIR" update-ref refs/remotes/origin/main "$BASE_SHA" 0000000000000000000000000000000000000000
+          test "$(git -C "$CANDIDATE_DIR" rev-parse --verify 'refs/remotes/origin/main^{commit}')" = "$BASE_SHA"
+          printf 'workflow_blob=%s\n' "$(git -C "$HARNESS_DIR" rev-parse "$EVENT_AFTER:$WORKFLOW_PATH")" >> "$GITHUB_OUTPUT"
+          printf 'workflow_content_sha256=%s\n' "$(sha256sum "$HARNESS_DIR/$WORKFLOW_PATH" | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+  shards:
+    name: H12 shard ${{ matrix.index }} · ${{ matrix.shard }}
+    needs: guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ matrix.job_cap }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - index: "01"
+            shard: core-unit-fast
+            config: test/vitest/vitest.full-core-unit-fast.config.ts
+            step_cap: 30
+            job_cap: 75
+          - index: "02"
+            shard: core-unit-src
+            config: test/vitest/vitest.full-core-unit-src.config.ts
+            step_cap: 30
+            job_cap: 75
+          - index: "03"
+            shard: core-unit-security
+            config: test/vitest/vitest.full-core-unit-security.config.ts
+            step_cap: 15
+            job_cap: 60
+          - index: "04"
+            shard: core-unit-support
+            config: test/vitest/vitest.full-core-unit-support.config.ts
+            step_cap: 15
+            job_cap: 60
+          - index: "05"
+            shard: core-support-boundary
+            config: test/vitest/vitest.full-core-support-boundary.config.ts
+            step_cap: 10
+            job_cap: 55
+          - index: "06"
+            shard: core-tooling
+            config: test/vitest/vitest.full-core-tooling.config.ts
+            step_cap: 45
+            job_cap: 90
+          - index: "07"
+            shard: core-contracts
+            config: test/vitest/vitest.full-core-contracts.config.ts
+            step_cap: 30
+            job_cap: 75
+          - index: "08"
+            shard: core-bundled
+            config: test/vitest/vitest.full-core-bundled.config.ts
+            step_cap: 10
+            job_cap: 55
+          - index: "09"
+            shard: core-runtime
+            config: test/vitest/vitest.full-core-runtime.config.ts
+            step_cap: 75
+            job_cap: 120
+          - index: "10"
+            shard: agentic
+            config: test/vitest/vitest.full-agentic.config.ts
+            step_cap: 120
+            job_cap: 165
+          - index: "11"
+            shard: auto-reply
+            config: test/vitest/vitest.full-auto-reply.config.ts
+            step_cap: 30
+            job_cap: 75
+          - index: "12"
+            shard: extensions
+            config: test/vitest/vitest.full-extensions.config.ts
+            step_cap: 150
+            job_cap: 195
+    env:
+      CANDIDATE_DIR: ${{ github.workspace }}/candidate
+      SHARD_INDEX: ${{ matrix.index }}
+      SHARD_NAME: ${{ matrix.shard }}
+      SHARD_CONFIG: ${{ matrix.config }}
+      TEST_STEP_CAP: ${{ matrix.step_cap }}
+      TEST_JOB_CAP: ${{ matrix.job_cap }}
+    steps:
+      - name: Initialize shard evidence
+        id: initialize
+        shell: bash
+        timeout-minutes: 2
+        env:
+          RUNNER_ENVIRONMENT_VALUE: ${{ runner.environment }}
+          RUNNER_OS_VALUE: ${{ runner.os }}
+          RUNNER_ARCH_VALUE: ${{ runner.arch }}
+          EVIDENCE_DIR_INIT: ${{ runner.temp }}/r7-h12-shard-${{ matrix.index }}-${{ matrix.shard }}
+          PNPM_STORE_DIR_INIT: ${{ runner.temp }}/r7-h12-store-${{ matrix.index }}-${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          test -n "${RUNNER_TEMP:-}"
+          test -n "${GITHUB_ENV:-}"
+          test "$EVIDENCE_DIR_INIT" = "$RUNNER_TEMP/r7-h12-shard-$SHARD_INDEX-$SHARD_NAME"
+          test "$PNPM_STORE_DIR_INIT" = "$RUNNER_TEMP/r7-h12-store-$SHARD_INDEX-$SHARD_NAME"
+          EVIDENCE_DIR="$EVIDENCE_DIR_INIT"
+          PNPM_STORE_DIR="$PNPM_STORE_DIR_INIT"
+          printf 'EVIDENCE_DIR=%s\n' "$EVIDENCE_DIR" >> "$GITHUB_ENV"
+          printf 'PNPM_STORE_DIR=%s\n' "$PNPM_STORE_DIR" >> "$GITHUB_ENV"
+          test "$RUNNER_ENVIRONMENT_VALUE" = "github-hosted"
+          test "$RUNNER_OS_VALUE" = "Linux"
+          test "$RUNNER_ARCH_VALUE" = "X64"
+          test -n "${ImageOS:-}"
+          test -n "${ImageVersion:-}"
+          test ! -e "$EVIDENCE_DIR"
+          test ! -e "$PNPM_STORE_DIR"
+          mkdir -p "$EVIDENCE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/job.started"
+          printf 'r7-h12-shard-%s-%s-P2-%s-attempt-1\n' "$SHARD_INDEX" "$SHARD_NAME" "$GITHUB_RUN_ID" > "$EVIDENCE_DIR/artifact-name.txt"
+      - name: Checkout detached P2
+        id: checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: 7492177a7068ca7481dd355f37b2d7a21630e9bc
+          path: candidate
+          fetch-depth: 3
+          persist-credentials: false
+          clean: true
+      - name: Guard full detached P2 source
+        id: source
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/source.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD)" = "$P2_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^{tree})" = "$P2_TREE"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^)" = "$P_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^^)" = "$BASE_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA^{tree}")" = "$P_TREE"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA^{tree}")" = "$BASE_TREE"
+            read -r -a p2_parents <<< "$(git -C "$CANDIDATE_DIR" rev-list --parents -n 1 "$P2_SHA")"
+            test "${#p2_parents[@]}" -eq 2
+            test "${p2_parents[0]}" = "$P2_SHA"
+            test "${p2_parents[1]}" = "$P_SHA"
+            read -r -a p_parents <<< "$(git -C "$CANDIDATE_DIR" rev-list --parents -n 1 "$P_SHA")"
+            test "${#p_parents[@]}" -eq 2
+            test "${p_parents[0]}" = "$P_SHA"
+            test "${p_parents[1]}" = "$BASE_SHA"
+            if git -C "$CANDIDATE_DIR" symbolic-ref -q HEAD; then exit 1; fi
+            test -z "$(git -C "$CANDIDATE_DIR" status --porcelain=v1 --untracked-files=no)"
+            test -f "$CANDIDATE_DIR/$SHARD_CONFIG"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:$SHARD_CONFIG")" = "$(git -C "$CANDIDATE_DIR" hash-object "$CANDIDATE_DIR/$SHARD_CONFIG")"
+            inc_expected="$RUNNER_TEMP/h12-inc-$SHARD_INDEX.expected"
+            inc_actual="$RUNNER_TEMP/h12-inc-$SHARD_INDEX.actual"
+            printf '%s\n' \
+              src/auto-reply/reply/model-selection-catalog-loader.ts \
+              src/auto-reply/reply/model-selection.ts \
+              src/gateway/server-methods/models-list-auth-resolver.ts \
+              src/gateway/server-methods/models-list-result.ts \
+              src/gateway/server-model-catalog.test.ts \
+              | LC_ALL=C sort > "$inc_expected"
+            git -C "$CANDIDATE_DIR" diff --name-only "$P_SHA" "$P2_SHA" | LC_ALL=C sort > "$inc_actual"
+            diff -u "$inc_expected" "$inc_actual"
+            read -r ii id ifiles <<< "$(git -C "$CANDIDATE_DIR" diff --numstat "$P_SHA" "$P2_SHA" | awk 'BEGIN { i=0; d=0; f=0 } { if ($1 == "-" || $2 == "-") exit 2; i += $1; d += $2; f += 1 } END { print i, d, f }')"
+            test "$ii" -eq 130
+            test "$id" -eq 94
+            test "$ifiles" -eq 5
+            git -C "$CANDIDATE_DIR" diff --check "$P_SHA" "$P2_SHA"
+            test "$(git -C "$CANDIDATE_DIR" diff --full-index --binary "$P_SHA" "$P2_SHA" | sha256sum | awk '{print $1}')" = "$INCREMENTAL_DIFF_SHA256"
+            cum_expected="$RUNNER_TEMP/h12-cum-$SHARD_INDEX.expected"
+            cum_actual="$RUNNER_TEMP/h12-cum-$SHARD_INDEX.actual"
+            printf '%s\n' \
+              src/agents/prepared-model-catalog.test.ts \
+              src/agents/prepared-model-catalog.ts \
+              src/auto-reply/reply/get-reply-directives.ts \
+              src/auto-reply/reply/get-reply.config-override.test.ts \
+              src/auto-reply/reply/get-reply.imports.test.ts \
+              src/auto-reply/reply/get-reply.ts \
+              src/auto-reply/reply/model-selection-catalog-loader.ts \
+              src/auto-reply/reply/model-selection.test.ts \
+              src/auto-reply/reply/model-selection.ts \
+              src/gateway/server-methods/models-list-auth-resolver.ts \
+              src/gateway/server-methods/models-list-result.ts \
+              src/gateway/server-model-catalog.test.ts \
+              | LC_ALL=C sort > "$cum_expected"
+            git -C "$CANDIDATE_DIR" diff --name-only "$BASE_SHA" "$P2_SHA" | LC_ALL=C sort > "$cum_actual"
+            diff -u "$cum_expected" "$cum_actual"
+            read -r ci cd cfiles <<< "$(git -C "$CANDIDATE_DIR" diff --numstat "$BASE_SHA" "$P2_SHA" | awk 'BEGIN { i=0; d=0; f=0 } { if ($1 == "-" || $2 == "-") exit 2; i += $1; d += $2; f += 1 } END { print i, d, f }')"
+            test "$ci" -eq 463
+            test "$cd" -eq 96
+            test "$cfiles" -eq 12
+            git -C "$CANDIDATE_DIR" diff --check "$BASE_SHA" "$P2_SHA"
+            test "$(git -C "$CANDIDATE_DIR" diff --full-index --binary "$BASE_SHA" "$P2_SHA" | sha256sum | awk '{print $1}')" = "$CUMULATIVE_DIFF_SHA256"
+            git -C "$CANDIDATE_DIR" diff --quiet "$BASE_SHA" "$P_SHA" -- package.json pnpm-lock.yaml
+            git -C "$CANDIDATE_DIR" diff --quiet "$P_SHA" "$P2_SHA" -- package.json pnpm-lock.yaml
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:test/vitest/vitest.test-shards.mjs")" = "$SHARDS_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:test/vitest/vitest.timeouts.ts")" = "$TIMEOUTS_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:test/vitest/vitest.shared.config.ts")" = "$SHARED_CONFIG_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:scripts/run-vitest.mjs")" = "$RUN_VITEST_BLOB_SHA"
+            test "$(node -p "require('$CANDIDATE_DIR/package.json').packageManager")" = "$EXPECTED_PACKAGE_MANAGER"
+            test "$(git -C "$CANDIDATE_DIR" show "$P2_SHA:test/vitest/vitest.timeouts.ts" | tr -d '[:space:]')" = "exportconstDEFAULT_VITEST_TEST_TIMEOUT_MS=120_000;"
+            if git -C "$CANDIDATE_DIR" rev-parse --verify 'refs/remotes/origin/main^{commit}' >/dev/null 2>&1; then exit 1; fi
+            git -C "$CANDIDATE_DIR" update-ref refs/remotes/origin/main "$BASE_SHA" 0000000000000000000000000000000000000000
+            test "$(git -C "$CANDIDATE_DIR" rev-parse --verify 'refs/remotes/origin/main^{commit}')" = "$BASE_SHA"
+          ) > "$EVIDENCE_DIR/source.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/source.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/source.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/source.ended"
+          exit "$rc"
+
+
+      - name: Set up exact Node 24.15.0
+        id: setup_node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24.15.0
+      - name: Bind exact pnpm and fresh store
+        id: tooling
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/tooling.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(node --version)" = "v24.15.0"
+            package_manager="$(node -p "require('$CANDIDATE_DIR/package.json').packageManager")"
+            test "$package_manager" = "$EXPECTED_PACKAGE_MANAGER"
+            expected_pnpm="${package_manager#pnpm@}"
+            expected_pnpm="${expected_pnpm%%+*}"
+            corepack enable
+            corepack prepare "$package_manager" --activate
+            test "$(pnpm --version)" = "$expected_pnpm"
+            test ! -e "$PNPM_STORE_DIR"
+            mkdir -p "$PNPM_STORE_DIR"
+            node --version > "$EVIDENCE_DIR/node.version"
+            pnpm --version > "$EVIDENCE_DIR/pnpm.version"
+            printf '%s\n' "$package_manager" > "$EVIDENCE_DIR/package-manager.txt"
+          ) > "$EVIDENCE_DIR/tooling.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/tooling.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/tooling.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/tooling.ended"
+          exit "$rc"
+      - name: Frozen install once
+        id: install
+        shell: bash
+        timeout-minutes: 20
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install.started"
+          set +e
+          pnpm install --frozen-lockfile --store-dir "$PNPM_STORE_DIR" 2>&1 | tee "$EVIDENCE_DIR/install.log"
+          pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          rc="${pipeline_status[0]}"
+          if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/install.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install.ended"
+          exit "$rc"
+      - name: Capture pre-test resources
+        id: resource
+        shell: bash
+        timeout-minutes: 3
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/resource.started"
+          set +e
+          (
+            set -euo pipefail
+            printf 'nproc='
+            nproc
+            df -Pk "$CANDIDATE_DIR"
+            cat /proc/meminfo
+            for kind in cpu memory io; do
+              test -r "/proc/pressure/$kind"
+              printf '%s\n' "psi:$kind"
+              cat "/proc/pressure/$kind"
+            done
+          ) > "$EVIDENCE_DIR/resource.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/resource.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/resource.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/resource.ended"
+          exit "$rc"
+      - name: Run one shard-native Vitest process
+        id: test
+        shell: bash
+        timeout-minutes: ${{ matrix.step_cap }}
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          bound_json="$EVIDENCE_DIR/test-results.json"
+          time_file="$EVIDENCE_DIR/test.time"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/test.started"
+          printf 'GITHUB_WORKSPACE="%s" /usr/bin/time -v -o "%s" node scripts/run-vitest.mjs run --config "%s" --reporter=verbose --reporter=json --outputFile.json="%s"\n' \
+            "$CANDIDATE_DIR" "$time_file" "$SHARD_CONFIG" "$bound_json" > "$EVIDENCE_DIR/command.txt"
+          set +e
+          GITHUB_WORKSPACE="$CANDIDATE_DIR" /usr/bin/time -v -o "$time_file" node scripts/run-vitest.mjs run \
+            --config "$SHARD_CONFIG" \
+            --reporter=verbose \
+            --reporter=json \
+            --outputFile.json="$bound_json" \
+            2>&1 | tee "$EVIDENCE_DIR/test.log"
+          pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          rc="${pipeline_status[0]}"
+          if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/test.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/test.ended"
+          exit "$rc"
+      - name: Capture post-test resources and P2 poststate
+        id: poststate
+        if: always()
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/resource-after.started"
+          set +e
+          (
+            set -euo pipefail
+            printf 'nproc='
+            nproc
+            df -Pk "$CANDIDATE_DIR"
+            cat /proc/meminfo
+            for kind in cpu memory io; do
+              test -r "/proc/pressure/$kind"
+              printf '%s\n' "psi:$kind"
+              cat "/proc/pressure/$kind"
+            done
+          ) > "$EVIDENCE_DIR/resource-after.log" 2>&1
+          resource_rc=$?
+          set -e
+          printf '%s\n' "$resource_rc" > "$EVIDENCE_DIR/resource-after.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/resource-after.ended"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/poststate.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD)" = "$P2_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^{tree})" = "$P2_TREE"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^)" = "$P_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^^)" = "$BASE_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse --verify 'refs/remotes/origin/main^{commit}')" = "$BASE_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+          test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+            test -z "$(git -C "$CANDIDATE_DIR" status --porcelain=v1 --untracked-files=no)"
+          ) > "$EVIDENCE_DIR/poststate.log" 2>&1
+          post_rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/resource-after.log"
+          cat "$EVIDENCE_DIR/poststate.log"
+          printf '%s\n' "$post_rc" > "$EVIDENCE_DIR/poststate.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/poststate.ended"
+          if test "$resource_rc" -ne 0; then exit "$resource_rc"; fi
+          exit "$post_rc"
+
+      - name: Finalize shard manifest
+        id: finalize
+        if: always()
+        shell: bash
+        timeout-minutes: 8
+        env:
+          EVENT_H_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUNNER_NAME_VALUE: ${{ runner.name }}
+          RUNNER_ENVIRONMENT_VALUE: ${{ runner.environment }}
+          RUNNER_OS_VALUE: ${{ runner.os }}
+          RUNNER_ARCH_VALUE: ${{ runner.arch }}
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          INITIALIZE_OUTCOME: ${{ steps.initialize.outcome }}
+          SOURCE_OUTCOME: ${{ steps.source.outcome }}
+          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
+          TOOLING_OUTCOME: ${{ steps.tooling.outcome }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          RESOURCE_OUTCOME: ${{ steps.resource.outcome }}
+          TEST_OUTCOME: ${{ steps.test.outcome }}
+          POSTSTATE_OUTCOME: ${{ steps.poststate.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/finalize.started"
+          set +e
+          python3 - 2>&1 <<'PY' | tee "$EVIDENCE_DIR/finalize.log"
+          import json
+          import os
+          import pathlib
+          import re
+          import sys
+
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          candidate = pathlib.Path(os.environ["CANDIDATE_DIR"])
+          errors: list[str] = []
+
+          def regular(name: str) -> pathlib.Path | None:
+              path = evidence / name
+              if not path.is_file() or path.is_symlink():
+                  errors.append(f"missing or non-regular evidence: {name}")
+                  return None
+              return path
+
+          def text(name: str) -> str | None:
+              path = regular(name)
+              return path.read_text(encoding="utf-8", errors="replace").strip() if path else None
+
+          def integer(name: str) -> int | None:
+              value = text(name)
+              if value is None or not re.fullmatch(r"[0-9]+", value):
+                  errors.append(f"invalid integer evidence: {name}")
+                  return None
+              return int(value)
+
+          def nonnegative_int(obj: dict, key: str) -> int | None:
+              value = obj.get(key)
+              if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                  errors.append(f"{key} must be a non-negative integer")
+                  return None
+              return value
+
+          outcomes = {
+              "checkout": os.environ.get("CHECKOUT_OUTCOME", ""),
+              "initialize": os.environ.get("INITIALIZE_OUTCOME", ""),
+              "source": os.environ.get("SOURCE_OUTCOME", ""),
+              "setupNode": os.environ.get("SETUP_NODE_OUTCOME", ""),
+              "tooling": os.environ.get("TOOLING_OUTCOME", ""),
+              "install": os.environ.get("INSTALL_OUTCOME", ""),
+              "resource": os.environ.get("RESOURCE_OUTCOME", ""),
+              "test": os.environ.get("TEST_OUTCOME", ""),
+              "poststate": os.environ.get("POSTSTATE_OUTCOME", ""),
+          }
+          for name, outcome in outcomes.items():
+              if outcome != "success":
+                  errors.append(f"step {name} outcome is {outcome or 'NOT_RUN'}")
+
+          job_started = text("job.started")
+          for stem in ["source", "tooling", "install", "resource", "test", "resource-after", "poststate"]:
+              started = text(f"{stem}.started")
+              ended = text(f"{stem}.ended")
+              for label, value in [("started", started), ("ended", ended)]:
+                  if value is not None and not re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value):
+                      errors.append(f"invalid UTC marker: {stem}.{label}")
+              if started is not None and ended is not None and started > ended:
+                  errors.append(f"negative UTC interval: {stem}")
+          if job_started is not None and not re.fullmatch(r"\d{4}-\d{2}T\d{2}:\d{2}:\d{2}Z", job_started):
+              errors.append("invalid job UTC marker")
+
+          exit_stems = ["source", "tooling", "install", "resource", "test", "resource-after", "poststate"]
+          exits = {stem: integer(f"{stem}.exit") for stem in exit_stems}
+          for stem, code in exits.items():
+              if code != 0:
+                  errors.append(f"{stem} exit is {code!r}")
+
+          time_path = evidence / "test.time"
+          json_path = evidence / "test-results.json"
+          expected_command = (
+              f'GITHUB_WORKSPACE="{candidate}" /usr/bin/time -v -o "{time_path}" '
+              f'node scripts/run-vitest.mjs run --config "{os.environ["SHARD_CONFIG"]}" '
+              f'--reporter=verbose --reporter=json --outputFile.json="{json_path}"'
+          )
+          command_text = text("command.txt")
+          if command_text is not None and command_text != expected_command:
+              errors.append("exact shard command mismatch")
+
+          time_text = text("test.time")
+          for marker in [
+              "Command being timed:", "User time (seconds):", "System time (seconds):",
+              "Elapsed (wall clock) time", "Maximum resident set size (kbytes):",
+              "Voluntary context switches:", "Involuntary context switches:", "Exit status: 0",
+          ]:
+              if time_text is not None and marker not in time_text:
+                  errors.append(f"GNU time marker missing: {marker}")
+          runtime_millis = None
+          if time_text is not None:
+              elapsed_lines = [
+                  line.strip() for line in time_text.splitlines()
+                  if line.strip().startswith("Elapsed (wall clock) time")
+              ]
+              if len(elapsed_lines) != 1 or ": " not in elapsed_lines[0]:
+                  errors.append("GNU time elapsed value is missing or ambiguous")
+              else:
+                  elapsed_value = elapsed_lines[0].rsplit(": ", 1)[1]
+                  try:
+                      parts = elapsed_value.split(":")
+                      if len(parts) == 2:
+                          seconds = int(parts[0]) * 60 + float(parts[1])
+                      elif len(parts) == 3:
+                          seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+                      else:
+                          raise ValueError("unexpected elapsed format")
+                      runtime_millis = round(seconds * 1000)
+                      if runtime_millis < 0:
+                          raise ValueError("negative elapsed value")
+                  except (TypeError, ValueError) as exc:
+                      runtime_millis = None
+                      errors.append(f"invalid GNU time elapsed value: {exc}")
+
+          for resource_name in ["resource.log", "resource-after.log"]:
+              resource_text = text(resource_name)
+              for marker in ["nproc=", "Filesystem", "MemTotal:", "MemAvailable:", "psi:cpu", "psi:memory", "psi:io"]:
+                  if resource_text is not None and marker not in resource_text:
+                      errors.append(f"{resource_name} missing {marker}")
+
+          report_path = regular("test-results.json")
+          report: dict = {}
+          if report_path:
+              try:
+                  loaded = json.loads(report_path.read_text(encoding="utf-8"))
+                  if not isinstance(loaded, dict):
+                      raise TypeError("root is not an object")
+                  report = loaded
+              except Exception as exc:
+                  errors.append(f"invalid test JSON: {exc}")
+
+          test_results = report.get("testResults")
+          if not isinstance(test_results, list) or not test_results:
+              errors.append("testResults must contain positive test files")
+              test_results = []
+          assertions = []
+          non_failing_statuses = {"passed", "skipped", "pending", "todo"}
+          file_status_cardinality = {status: 0 for status in sorted(non_failing_statuses)}
+          assertion_status_cardinality = {status: 0 for status in sorted(non_failing_statuses)}
+          for result in test_results:
+              if not isinstance(result, dict):
+                  errors.append("testResults entry is not an object")
+                  continue
+              file_status = result.get("status")
+              if file_status not in non_failing_statuses:
+                  errors.append(f"unknown or failing test file status: {file_status!r}")
+              else:
+                  file_status_cardinality[file_status] += 1
+              values = result.get("assertionResults")
+              if not isinstance(values, list):
+                  errors.append("assertionResults is not a list")
+                  continue
+              for item in values:
+                  assertions.append(item)
+                  if not isinstance(item, dict):
+                      errors.append("assertionResults entry is not an object")
+                      continue
+                  assertion_status = item.get("status")
+                  if assertion_status not in non_failing_statuses:
+                      errors.append(f"unknown or failing assertion status: {assertion_status!r}")
+                  else:
+                      assertion_status_cardinality[assertion_status] += 1
+          if not assertions:
+              errors.append("assertionResults must be positive")
+          if assertion_status_cardinality["passed"] <= 0:
+              errors.append("at least one real passed assertion is required")
+          if file_status_cardinality["passed"] <= 0:
+              errors.append("at least one passed test file is required")
+          if sum(file_status_cardinality.values()) != len(test_results):
+              errors.append("file status cardinalities do not equal testResults cardinality")
+
+          count_keys = [
+              "numTotalTests", "numPassedTests", "numFailedTests", "numPendingTests", "numTodoTests",
+              "numTotalTestSuites", "numPassedTestSuites", "numFailedTestSuites", "numPendingTestSuites",
+          ]
+          counts = {key: nonnegative_int(report, key) for key in count_keys}
+          if counts["numTotalTests"] is not None and counts["numTotalTests"] != len(assertions):
+              errors.append("numTotalTests does not equal assertionResults cardinality")
+          expected_test_counts = {
+              "numPassedTests": assertion_status_cardinality["passed"],
+              "numFailedTests": 0,
+              "numPendingTests": (
+                  assertion_status_cardinality["skipped"] + assertion_status_cardinality["pending"]
+              ),
+              "numTodoTests": assertion_status_cardinality["todo"],
+          }
+          for key, expected_value in expected_test_counts.items():
+              if counts[key] is not None and counts[key] != expected_value:
+                  errors.append(f"{key} does not match assertion status cardinalities")
+          if all(counts[key] is not None for key in count_keys[:5]):
+              test_sum = (
+                  counts["numPassedTests"] + counts["numFailedTests"]
+                  + counts["numPendingTests"] + counts["numTodoTests"]
+              )
+              if test_sum != counts["numTotalTests"]:
+                  errors.append("test category counts are incoherent")
+          if all(counts[key] is not None for key in count_keys[5:]):
+              suite_sum = (
+                  counts["numPassedTestSuites"] + counts["numFailedTestSuites"]
+                  + counts["numPendingTestSuites"]
+              )
+              if suite_sum != counts["numTotalTestSuites"]:
+                  errors.append("suite category counts are incoherent")
+          if counts["numTotalTests"] is not None and counts["numTotalTests"] <= 0:
+              errors.append("numTotalTests must be positive")
+          if counts["numPassedTests"] is not None and counts["numPassedTests"] <= 0:
+              errors.append("numPassedTests must be positive")
+          if counts["numFailedTests"] != 0:
+              errors.append("numFailedTests must be zero")
+          if counts["numTotalTestSuites"] is not None and counts["numTotalTestSuites"] <= 0:
+              errors.append("numTotalTestSuites must be positive")
+          if counts["numPassedTestSuites"] is not None and counts["numPassedTestSuites"] <= 0:
+              errors.append("numPassedTestSuites must be positive")
+          if counts["numFailedTestSuites"] != 0:
+              errors.append("numFailedTestSuites must be zero")
+          if report.get("success") is not True:
+              errors.append("report.success is not true")
+
+          test_exit = exits["test"]
+          if test_exit is None:
+              disposition = {"status": "UNKNOWN", "timeout": "UNKNOWN", "signal": "UNKNOWN", "exit": "UNKNOWN"}
+          elif test_exit > 128:
+              disposition = {"status": "FAIL", "timeout": "NO", "signal": test_exit - 128, "exit": test_exit}
+          else:
+              disposition = {
+                  "status": "PASS" if test_exit == 0 and outcomes["test"] == "success" else "FAIL",
+                  "timeout": "NO", "signal": "NONE", "exit": test_exit,
+              }
+          (evidence / "test-disposition.json").write_text(
+              json.dumps(disposition, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+
+          artifact_name = text("artifact-name.txt")
+          node_version = text("node.version")
+          pnpm_version = text("pnpm.version")
+          package_manager = text("package-manager.txt")
+          passed = not errors and disposition["status"] == "PASS"
+          final = {"status": "PASS" if passed else "FAIL", "exit": 0 if passed else 1}
+          (evidence / "finalstatus.json").write_text(
+              json.dumps(final, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          manifest = {
+              "schema": "openclaw.gateway-r7-h12-shard.v1",
+              "disposition": "SHARD_NATIVE_SUBSTITUTE",
+              "artifact": {"name": artifact_name, "retentionDays": 90, "overwrite": False},
+              "harness": {"commit": os.environ["EVENT_H_SHA"], "parent": os.environ["P2_SHA"]},
+              "payload": {
+                  "commit": os.environ["P2_SHA"], "tree": os.environ["P2_TREE"],
+                  "parent": os.environ["P_SHA"], "base": os.environ["BASE_SHA"],
+                  "incrementalDiffSha256": os.environ["INCREMENTAL_DIFF_SHA256"],
+                  "cumulativeDiffSha256": os.environ["CUMULATIVE_DIFF_SHA256"],
+              },
+              "matrix": {
+                  "index": os.environ["SHARD_INDEX"], "name": os.environ["SHARD_NAME"],
+                  "config": os.environ["SHARD_CONFIG"],
+                  "testStepCapMinutes": int(os.environ["TEST_STEP_CAP"]),
+                  "jobCapMinutes": int(os.environ["TEST_JOB_CAP"]), "perTestTimeoutMs": 120000,
+              },
+              "run": {
+                  "id": os.environ["RUN_ID"], "attempt": int(os.environ["RUN_ATTEMPT"]),
+                  "event": os.environ["EVENT_NAME"], "ref": os.environ["EVENT_REF"],
+                  "repository": os.environ["EVENT_REPOSITORY"],
+              },
+              "runner": {
+                  "name": os.environ["RUNNER_NAME_VALUE"],
+                  "environment": os.environ["RUNNER_ENVIRONMENT_VALUE"],
+                  "os": os.environ["RUNNER_OS_VALUE"], "arch": os.environ["RUNNER_ARCH_VALUE"],
+                  "imageOS": os.environ.get("ImageOS"), "imageVersion": os.environ.get("ImageVersion"),
+              },
+              "toolchain": {
+                  "node": node_version, "pnpm": pnpm_version, "packageManager": package_manager,
+                  "freshStore": str(pathlib.Path(os.environ["PNPM_STORE_DIR"])), "frozenInstalls": 1,
+              },
+              "command": expected_command,
+              "checks": {
+                  "source": "PASS" if outcomes["source"] == "success" and exits["source"] == 0 else "FAIL",
+                  "test": disposition["status"],
+                  "resource": "PASS" if exits["resource"] == 0 and exits["resource-after"] == 0 else "FAIL",
+                  "poststate": "PASS" if outcomes["poststate"] == "success" and exits["poststate"] == 0 else "FAIL",
+              },
+              "testSummary": {
+                  "files": len(test_results), "assertions": len(assertions),
+                  "fileStatusCardinality": file_status_cardinality,
+                  "assertionStatusCardinality": assertion_status_cardinality,
+                  "counts": counts, "success": report.get("success"),
+                  "runtime": {"source": "gnu-time-wall-clock", "wallClockMillis": runtime_millis},
+              },
+              "testDisposition": disposition, "steps": outcomes, "errors": errors, "final": final,
+          }
+          (evidence / "manifest.json").write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps({"final": final, "errors": errors}, sort_keys=True))
+          sys.exit(final["exit"])
+          PY
+          pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          rc="${pipeline_status[0]}"
+          if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/finalize.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/finalize.ended"
+          exit "$rc"
+      - name: Seal shard evidence
+        id: seal
+        if: always()
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          manifest_path = evidence / "manifest.json"
+          final_path = evidence / "finalstatus.json"
+          if not manifest_path.is_file() or manifest_path.is_symlink():
+              raise SystemExit("manifest missing or non-regular")
+          if not final_path.is_file() or final_path.is_symlink():
+              raise SystemExit("finalstatus missing or non-regular")
+          final = json.loads(final_path.read_text(encoding="utf-8"))
+          required = {
+              "artifact-name.txt", "command.txt", "finalize.ended", "finalize.exit", "finalize.log",
+              "finalize.started", "finalstatus.json", "install.ended", "install.exit", "install.log",
+              "install.started", "job.started", "manifest.json", "node.version", "package-manager.txt",
+              "pnpm.version", "poststate.ended", "poststate.exit", "poststate.log", "poststate.started",
+              "resource-after.ended", "resource-after.exit", "resource-after.log", "resource-after.started",
+              "resource.ended", "resource.exit", "resource.log", "resource.started", "source.ended",
+              "source.exit", "source.log", "source.started", "test-disposition.json", "test-results.json",
+              "test.ended", "test.exit", "test.log", "test.started", "test.time", "tooling.ended",
+              "tooling.exit", "tooling.log", "tooling.started",
+          }
+          entries = sorted(evidence.iterdir(), key=lambda path: path.name)
+          invalid = [path.name for path in entries if path.is_symlink() or not path.is_file()]
+          if invalid:
+              raise SystemExit(f"non-regular shard evidence: {invalid!r}")
+          actual = {path.name for path in entries}
+          if final.get("status") == "PASS" and not required.issubset(actual):
+              raise SystemExit(f"PASS shard evidence missing: {sorted(required - actual)!r}")
+          hashes = {
+              path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in entries if path.name != "seal.json"
+          }
+          (evidence / "seal.json").write_text(
+              json.dumps({"algorithm": "sha256", "files": hashes}, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Upload shard evidence
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: r7-h12-shard-${{ matrix.index }}-${{ matrix.shard }}-P2-${{ github.run_id }}-attempt-1
+          path: ${{ env.EVIDENCE_DIR }}
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  build:
+    name: H12 build after 12-of-12 aggregate PASS
+    needs: [guard, shards, aggregate]
+    if: needs.aggregate.outputs.aggregate_status == 'PASS'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    outputs:
+      build_status: ${{ steps.finalize.outputs.build_status }}
+    env:
+      CANDIDATE_DIR: ${{ github.workspace }}/candidate
+    steps:
+      - name: Initialize build envelope
+        id: initialize
+        shell: bash
+        timeout-minutes: 2
+        env:
+          RUNNER_ENVIRONMENT_VALUE: ${{ runner.environment }}
+          RUNNER_OS_VALUE: ${{ runner.os }}
+          RUNNER_ARCH_VALUE: ${{ runner.arch }}
+          EVIDENCE_DIR_INIT: ${{ runner.temp }}/r7-h12-build
+          PNPM_STORE_DIR_INIT: ${{ runner.temp }}/r7-h12-build-store
+        run: |
+          set -euo pipefail
+          test -n "${RUNNER_TEMP:-}"
+          test -n "${GITHUB_ENV:-}"
+          test "$EVIDENCE_DIR_INIT" = "$RUNNER_TEMP/r7-h12-build"
+          test "$PNPM_STORE_DIR_INIT" = "$RUNNER_TEMP/r7-h12-build-store"
+          EVIDENCE_DIR="$EVIDENCE_DIR_INIT"
+          PNPM_STORE_DIR="$PNPM_STORE_DIR_INIT"
+          printf 'EVIDENCE_DIR=%s\n' "$EVIDENCE_DIR" >> "$GITHUB_ENV"
+          printf 'PNPM_STORE_DIR=%s\n' "$PNPM_STORE_DIR" >> "$GITHUB_ENV"
+          test "$RUNNER_ENVIRONMENT_VALUE" = "github-hosted"
+          test "$RUNNER_OS_VALUE" = "Linux"
+          test "$RUNNER_ARCH_VALUE" = "X64"
+          test -n "${ImageOS:-}"
+          test -n "${ImageVersion:-}"
+          test ! -e "$EVIDENCE_DIR"
+          test ! -e "$PNPM_STORE_DIR"
+          mkdir -p "$EVIDENCE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/build-job.started"
+      - name: Checkout fresh detached P2
+        id: checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: 7492177a7068ca7481dd355f37b2d7a21630e9bc
+          path: candidate
+          fetch-depth: 3
+          persist-credentials: false
+          clean: true
+      - name: Guard full detached P2 build source
+        id: source
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/source.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD)" = "$P2_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^{tree})" = "$P2_TREE"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^)" = "$P_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^^)" = "$BASE_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA^{tree}")" = "$P_TREE"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA^{tree}")" = "$BASE_TREE"
+            read -r -a p2_parents <<< "$(git -C "$CANDIDATE_DIR" rev-list --parents -n 1 "$P2_SHA")"
+            test "${#p2_parents[@]}" -eq 2
+            test "${p2_parents[0]}" = "$P2_SHA"
+            test "${p2_parents[1]}" = "$P_SHA"
+            read -r -a p_parents <<< "$(git -C "$CANDIDATE_DIR" rev-list --parents -n 1 "$P_SHA")"
+            test "${#p_parents[@]}" -eq 2
+            test "${p_parents[0]}" = "$P_SHA"
+            test "${p_parents[1]}" = "$BASE_SHA"
+            if git -C "$CANDIDATE_DIR" symbolic-ref -q HEAD; then exit 1; fi
+            test -z "$(git -C "$CANDIDATE_DIR" status --porcelain=v1 --untracked-files=no)"
+            inc_expected="$RUNNER_TEMP/h12-build-inc.expected"
+            inc_actual="$RUNNER_TEMP/h12-build-inc.actual"
+            printf '%s\n' \
+              src/auto-reply/reply/model-selection-catalog-loader.ts \
+              src/auto-reply/reply/model-selection.ts \
+              src/gateway/server-methods/models-list-auth-resolver.ts \
+              src/gateway/server-methods/models-list-result.ts \
+              src/gateway/server-model-catalog.test.ts \
+              | LC_ALL=C sort > "$inc_expected"
+            git -C "$CANDIDATE_DIR" diff --name-only "$P_SHA" "$P2_SHA" | LC_ALL=C sort > "$inc_actual"
+            diff -u "$inc_expected" "$inc_actual"
+            read -r ii id ifiles <<< "$(git -C "$CANDIDATE_DIR" diff --numstat "$P_SHA" "$P2_SHA" | awk 'BEGIN { i=0; d=0; f=0 } { if ($1 == "-" || $2 == "-") exit 2; i += $1; d += $2; f += 1 } END { print i, d, f }')"
+            test "$ii" -eq 130
+            test "$id" -eq 94
+            test "$ifiles" -eq 5
+            git -C "$CANDIDATE_DIR" diff --check "$P_SHA" "$P2_SHA"
+            test "$(git -C "$CANDIDATE_DIR" diff --full-index --binary "$P_SHA" "$P2_SHA" | sha256sum | awk '{print $1}')" = "$INCREMENTAL_DIFF_SHA256"
+            cum_expected="$RUNNER_TEMP/h12-build-cum.expected"
+            cum_actual="$RUNNER_TEMP/h12-build-cum.actual"
+            printf '%s\n' \
+              src/agents/prepared-model-catalog.test.ts \
+              src/agents/prepared-model-catalog.ts \
+              src/auto-reply/reply/get-reply-directives.ts \
+              src/auto-reply/reply/get-reply.config-override.test.ts \
+              src/auto-reply/reply/get-reply.imports.test.ts \
+              src/auto-reply/reply/get-reply.ts \
+              src/auto-reply/reply/model-selection-catalog-loader.ts \
+              src/auto-reply/reply/model-selection.test.ts \
+              src/auto-reply/reply/model-selection.ts \
+              src/gateway/server-methods/models-list-auth-resolver.ts \
+              src/gateway/server-methods/models-list-result.ts \
+              src/gateway/server-model-catalog.test.ts \
+              | LC_ALL=C sort > "$cum_expected"
+            git -C "$CANDIDATE_DIR" diff --name-only "$BASE_SHA" "$P2_SHA" | LC_ALL=C sort > "$cum_actual"
+            diff -u "$cum_expected" "$cum_actual"
+            read -r ci cd cfiles <<< "$(git -C "$CANDIDATE_DIR" diff --numstat "$BASE_SHA" "$P2_SHA" | awk 'BEGIN { i=0; d=0; f=0 } { if ($1 == "-" || $2 == "-") exit 2; i += $1; d += $2; f += 1 } END { print i, d, f }')"
+            test "$ci" -eq 463
+            test "$cd" -eq 96
+            test "$cfiles" -eq 12
+            git -C "$CANDIDATE_DIR" diff --check "$BASE_SHA" "$P2_SHA"
+            test "$(git -C "$CANDIDATE_DIR" diff --full-index --binary "$BASE_SHA" "$P2_SHA" | sha256sum | awk '{print $1}')" = "$CUMULATIVE_DIFF_SHA256"
+            git -C "$CANDIDATE_DIR" diff --quiet "$BASE_SHA" "$P_SHA" -- package.json pnpm-lock.yaml
+            git -C "$CANDIDATE_DIR" diff --quiet "$P_SHA" "$P2_SHA" -- package.json pnpm-lock.yaml
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$BASE_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:test/vitest/vitest.test-shards.mjs")" = "$SHARDS_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:test/vitest/vitest.timeouts.ts")" = "$TIMEOUTS_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:test/vitest/vitest.shared.config.ts")" = "$SHARED_CONFIG_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:scripts/run-vitest.mjs")" = "$RUN_VITEST_BLOB_SHA"
+            test "$(node -p "require('$CANDIDATE_DIR/package.json').packageManager")" = "$EXPECTED_PACKAGE_MANAGER"
+            test "$(git -C "$CANDIDATE_DIR" show "$P2_SHA:test/vitest/vitest.timeouts.ts" | tr -d '[:space:]')" = "exportconstDEFAULT_VITEST_TEST_TIMEOUT_MS=120_000;"
+            if git -C "$CANDIDATE_DIR" rev-parse --verify 'refs/remotes/origin/main^{commit}' >/dev/null 2>&1; then exit 1; fi
+            git -C "$CANDIDATE_DIR" update-ref refs/remotes/origin/main "$BASE_SHA" 0000000000000000000000000000000000000000
+            test "$(git -C "$CANDIDATE_DIR" rev-parse --verify 'refs/remotes/origin/main^{commit}')" = "$BASE_SHA"
+          ) > "$EVIDENCE_DIR/source.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/source.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/source.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/source.ended"
+          exit "$rc"
+
+
+      - name: Set up exact Node 24.15.0
+        id: setup_node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24.15.0
+      - name: Bind exact pnpm and fresh build store
+        id: tooling
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/tooling.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(node --version)" = "v24.15.0"
+            package_manager="$(node -p "require('$CANDIDATE_DIR/package.json').packageManager")"
+            test "$package_manager" = "$EXPECTED_PACKAGE_MANAGER"
+            expected_pnpm="${package_manager#pnpm@}"
+            expected_pnpm="${expected_pnpm%%+*}"
+            corepack enable
+            corepack prepare "$package_manager" --activate
+            test "$(pnpm --version)" = "$expected_pnpm"
+            test ! -e "$PNPM_STORE_DIR"
+            mkdir -p "$PNPM_STORE_DIR"
+            node --version > "$EVIDENCE_DIR/node.version"
+            pnpm --version > "$EVIDENCE_DIR/pnpm.version"
+            printf '%s\n' "$package_manager" > "$EVIDENCE_DIR/package-manager.txt"
+          ) > "$EVIDENCE_DIR/tooling.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/tooling.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/tooling.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/tooling.ended"
+          exit "$rc"
+      - name: Frozen install once for build
+        id: install
+        shell: bash
+        timeout-minutes: 20
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install.started"
+          set +e
+          pnpm install --frozen-lockfile --store-dir "$PNPM_STORE_DIR" 2>&1 | tee "$EVIDENCE_DIR/install.log"
+          pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          rc="${pipeline_status[0]}"
+          if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/install.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install.ended"
+          exit "$rc"
+      - name: Require disk and memory before build
+        id: resource
+        shell: bash
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/resource.started"
+          set +e
+          (
+            set -euo pipefail
+            available_kib="$(df -Pk "$CANDIDATE_DIR" | awk 'NR == 2 { print $4 }')"
+            mem_available_kib="$(awk '/^MemAvailable:/ { print $2 }' /proc/meminfo)"
+            test "$available_kib" -ge 8388608
+            test "$mem_available_kib" -ge 4194304
+            printf 'nproc='
+            nproc
+            printf 'workspace_available_kib=%s\n' "$available_kib"
+            printf 'memory_available_kib=%s\n' "$mem_available_kib"
+            df -Pk "$CANDIDATE_DIR"
+            cat /proc/meminfo
+            for kind in cpu memory io; do
+              test -r "/proc/pressure/$kind"
+              printf '%s\n' "psi:$kind"
+              cat "/proc/pressure/$kind"
+            done
+          ) > "$EVIDENCE_DIR/resource.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/resource.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/resource.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/resource.ended"
+          exit "$rc"
+      - name: Run pnpm build exactly once
+        id: build
+        shell: bash
+        timeout-minutes: 120
+        working-directory: candidate
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/build.started"
+          printf '%s\n' 'pnpm build' > "$EVIDENCE_DIR/command.txt"
+          set +e
+          /usr/bin/time -v -o "$EVIDENCE_DIR/build.time" pnpm build 2>&1 | tee "$EVIDENCE_DIR/build.log"
+          pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          rc="${pipeline_status[0]}"
+          if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/build.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/build.ended"
+          exit "$rc"
+      - name: Capture final build resources and P2 poststate
+        id: poststate
+        if: always()
+        shell: bash
+        timeout-minutes: 6
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/resource-after.started"
+          set +e
+          (
+            set -euo pipefail
+            printf 'nproc='
+            nproc
+            df -Pk "$CANDIDATE_DIR"
+            cat /proc/meminfo
+            for kind in cpu memory io; do
+              test -r "/proc/pressure/$kind"
+              printf '%s\n' "psi:$kind"
+              cat "/proc/pressure/$kind"
+            done
+          ) > "$EVIDENCE_DIR/resource-after.log" 2>&1
+          resource_rc=$?
+          set -e
+          printf '%s\n' "$resource_rc" > "$EVIDENCE_DIR/resource-after.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/resource-after.ended"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/poststate.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD)" = "$P2_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^{tree})" = "$P2_TREE"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^)" = "$P_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse HEAD^^)" = "$BASE_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse --verify 'refs/remotes/origin/main^{commit}')" = "$BASE_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:package.json")" = "$PACKAGE_BLOB_SHA"
+            test "$(git -C "$CANDIDATE_DIR" rev-parse "$P2_SHA:pnpm-lock.yaml")" = "$LOCK_BLOB_SHA"
+            test -z "$(git -C "$CANDIDATE_DIR" status --porcelain=v1 --untracked-files=no)"
+          ) > "$EVIDENCE_DIR/poststate.log" 2>&1
+          post_rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/resource-after.log"
+          cat "$EVIDENCE_DIR/poststate.log"
+          printf '%s\n' "$post_rc" > "$EVIDENCE_DIR/poststate.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/poststate.ended"
+          if test "$resource_rc" -ne 0; then exit "$resource_rc"; fi
+          exit "$post_rc"
+
+      - name: Finalize build hash manifest
+        id: finalize
+        if: always()
+        shell: bash
+        timeout-minutes: 10
+        env:
+          EVENT_H_SHA: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
+          INITIALIZE_OUTCOME: ${{ steps.initialize.outcome }}
+          SOURCE_OUTCOME: ${{ steps.source.outcome }}
+          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
+          TOOLING_OUTCOME: ${{ steps.tooling.outcome }}
+          INSTALL_OUTCOME: ${{ steps.install.outcome }}
+          RESOURCE_OUTCOME: ${{ steps.resource.outcome }}
+          BUILD_OUTCOME: ${{ steps.build.outcome }}
+          POSTSTATE_OUTCOME: ${{ steps.poststate.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          set +e
+          python3 - 2>&1 <<'PY' | tee "$EVIDENCE_DIR/finalize.log"
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+          import sys
+
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          candidate = pathlib.Path(os.environ["CANDIDATE_DIR"])
+          errors: list[str] = []
+
+          def text(name: str) -> str | None:
+              path = evidence / name
+              if not path.is_file() or path.is_symlink():
+                  errors.append(f"missing or non-regular build evidence: {name}")
+                  return None
+              return path.read_text(encoding="utf-8", errors="replace").strip()
+
+          def integer(name: str) -> int | None:
+              value = text(name)
+              if value is None or not re.fullmatch(r"[0-9]+", value):
+                  errors.append(f"invalid integer build evidence: {name}")
+                  return None
+              return int(value)
+
+          outcomes = {
+              "checkout": os.environ.get("CHECKOUT_OUTCOME", ""),
+              "initialize": os.environ.get("INITIALIZE_OUTCOME", ""),
+              "source": os.environ.get("SOURCE_OUTCOME", ""),
+              "setupNode": os.environ.get("SETUP_NODE_OUTCOME", ""),
+              "tooling": os.environ.get("TOOLING_OUTCOME", ""),
+              "install": os.environ.get("INSTALL_OUTCOME", ""),
+              "resource": os.environ.get("RESOURCE_OUTCOME", ""),
+              "build": os.environ.get("BUILD_OUTCOME", ""),
+              "poststate": os.environ.get("POSTSTATE_OUTCOME", ""),
+          }
+          for name, outcome in outcomes.items():
+              if outcome != "success":
+                  errors.append(f"build step {name} outcome is {outcome or 'NOT_RUN'}")
+
+          exits = {
+              stem: integer(f"{stem}.exit")
+              for stem in ["source", "tooling", "install", "resource", "build", "resource-after", "poststate"]
+          }
+          for stem, code in exits.items():
+              if code != 0:
+                  errors.append(f"build {stem} exit is {code!r}")
+          if text("command.txt") != "pnpm build":
+              errors.append("build command mismatch")
+          time_text = text("build.time")
+          for marker in [
+              "Command being timed:", "User time (seconds):", "System time (seconds):",
+              "Elapsed (wall clock) time", "Maximum resident set size (kbytes):",
+              "Voluntary context switches:", "Involuntary context switches:", "Exit status: 0",
+          ]:
+              if time_text is not None and marker not in time_text:
+                  errors.append(f"build GNU time marker missing: {marker}")
+          for resource_name in ["resource.log", "resource-after.log"]:
+              value = text(resource_name)
+              for marker in ["nproc=", "Filesystem", "MemTotal:", "MemAvailable:", "psi:cpu", "psi:memory", "psi:io"]:
+                  if value is not None and marker not in value:
+                      errors.append(f"{resource_name} missing {marker}")
+
+          output_files: list[pathlib.Path] = []
+          roots = [candidate / "dist", candidate / "ui" / "dist", candidate / ".artifacts" / "build-all-cache"]
+          for root in roots:
+              if root.is_dir():
+                  output_files.extend(path for path in root.rglob("*") if path.is_file() and not path.is_symlink())
+          for owner in [candidate / "packages", candidate / "extensions"]:
+              if owner.is_dir():
+                  output_files.extend(
+                      path for path in owner.rglob("*")
+                      if path.is_file() and not path.is_symlink() and "dist" in path.relative_to(owner).parts
+                  )
+          output_files = sorted(set(output_files), key=lambda path: path.as_posix())
+          file_entries = []
+          total_bytes = 0
+          aggregate_hash = hashlib.sha256()
+          for path in output_files:
+              content = path.read_bytes()
+              relative = path.relative_to(candidate).as_posix()
+              digest = hashlib.sha256(content).hexdigest()
+              total_bytes += len(content)
+              aggregate_hash.update(f"{relative}\0{len(content)}\0{digest}\n".encode())
+              file_entries.append({"path": relative, "bytes": len(content), "sha256": digest})
+          if not output_files or total_bytes <= 0:
+              errors.append("build output count and bytes must be positive")
+          build_outputs = {
+              "schema": "openclaw.gateway-r7-h12-buildoutputs.v1",
+              "count": len(file_entries), "bytes": total_bytes,
+              "contentManifestSha256": aggregate_hash.hexdigest(), "files": file_entries,
+          }
+          (evidence / "buildoutputs.sha256.json").write_text(
+              json.dumps(build_outputs, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          passed = not errors
+          final = {"status": "PASS" if passed else "FAIL", "exit": 0 if passed else 1}
+          (evidence / "finalstatus.json").write_text(
+              json.dumps(final, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          manifest = {
+              "schema": "openclaw.gateway-r7-h12-build.v1",
+              "disposition": "SHARD_NATIVE_SUBSTITUTE",
+              "artifact": {
+                  "name": f"r7-h12-build-P2-{os.environ['RUN_ID']}-attempt-1",
+                  "retentionDays": 90, "overwrite": False,
+              },
+              "harness": {"commit": os.environ["EVENT_H_SHA"], "parent": os.environ["P2_SHA"]},
+              "payload": {
+                  "commit": os.environ["P2_SHA"], "tree": os.environ["P2_TREE"],
+                  "parent": os.environ["P_SHA"], "base": os.environ["BASE_SHA"],
+              },
+              "run": {"id": os.environ["RUN_ID"], "attempt": int(os.environ["RUN_ATTEMPT"])},
+              "commands": {"frozenInstalls": 1, "buildRuns": 1, "build": "pnpm build"},
+              "caps": {"buildStepMinutes": 120, "jobMinutes": 180},
+              "checks": {
+                  "source": "PASS" if exits["source"] == 0 else "FAIL",
+                  "resource": "PASS" if exits["resource"] == 0 and exits["resource-after"] == 0 else "FAIL",
+                  "build": "PASS" if exits["build"] == 0 else "FAIL",
+                  "poststate": "PASS" if exits["poststate"] == 0 else "FAIL",
+              },
+              "buildOutputs": build_outputs, "steps": outcomes, "errors": errors, "final": final,
+          }
+          (evidence / "manifest.json").write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"build_status={final['status']}\n")
+          print(json.dumps({"final": final, "errors": errors}, sort_keys=True))
+          sys.exit(final["exit"])
+          PY
+          pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          rc="${pipeline_status[0]}"
+          if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/finalize.exit"
+          exit "$rc"
+      - name: Seal build envelope
+        id: seal
+        if: always()
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          entries = sorted(evidence.iterdir(), key=lambda path: path.name)
+          invalid = [path.name for path in entries if path.is_symlink() or not path.is_file()]
+          if invalid:
+              raise SystemExit(f"non-regular build evidence: {invalid!r}")
+          required = {
+              "build.exit", "build.log", "build.time", "buildoutputs.sha256.json", "command.txt",
+              "finalize.exit", "finalize.log", "finalstatus.json", "install.exit", "install.log",
+              "manifest.json", "poststate.exit", "poststate.log", "resource-after.log",
+              "resource.log", "source.exit", "source.log", "tooling.exit", "tooling.log",
+          }
+          final = json.loads((evidence / "finalstatus.json").read_text(encoding="utf-8"))
+          actual = {path.name for path in entries}
+          if final.get("status") == "PASS" and not required.issubset(actual):
+              raise SystemExit(f"PASS build evidence missing: {sorted(required-actual)!r}")
+          hashes = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in entries}
+          (evidence / "seal.json").write_text(
+              json.dumps({"algorithm": "sha256", "files": hashes}, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Upload build hash envelope
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: r7-h12-build-P2-${{ github.run_id }}-attempt-1
+          path: |
+            ${{ env.EVIDENCE_DIR }}/*.log
+            ${{ env.EVIDENCE_DIR }}/*.json
+            ${{ env.EVIDENCE_DIR }}/*.txt
+            ${{ env.EVIDENCE_DIR }}/*.time
+            ${{ env.EVIDENCE_DIR }}/*.exit
+            ${{ env.EVIDENCE_DIR }}/*.started
+            ${{ env.EVIDENCE_DIR }}/*.ended
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+  aggregate:
+    name: H12 aggregate 12 shard envelopes
+    needs: [guard, shards]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      aggregate_status: ${{ steps.validate.outputs.aggregate_status }}
+    steps:
+      - name: Initialize aggregate envelope
+        id: initialize
+        shell: bash
+        timeout-minutes: 2
+        env:
+          DOWNLOAD_DIR_INIT: ${{ runner.temp }}/r7-h12-shard-downloads
+          EVIDENCE_DIR_INIT: ${{ runner.temp }}/r7-h12-aggregate
+        run: |
+          set -euo pipefail
+          test -n "${RUNNER_TEMP:-}"
+          test -n "${GITHUB_ENV:-}"
+          test "$DOWNLOAD_DIR_INIT" = "$RUNNER_TEMP/r7-h12-shard-downloads"
+          test "$EVIDENCE_DIR_INIT" = "$RUNNER_TEMP/r7-h12-aggregate"
+          DOWNLOAD_DIR="$DOWNLOAD_DIR_INIT"
+          EVIDENCE_DIR="$EVIDENCE_DIR_INIT"
+          printf 'DOWNLOAD_DIR=%s\n' "$DOWNLOAD_DIR" >> "$GITHUB_ENV"
+          printf 'EVIDENCE_DIR=%s\n' "$EVIDENCE_DIR" >> "$GITHUB_ENV"
+          test ! -e "$DOWNLOAD_DIR"
+          test ! -e "$EVIDENCE_DIR"
+          mkdir -p "$EVIDENCE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/aggregate.started"
+      - name: Download shard evidence
+        id: download
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: r7-h12-shard-*-P2-${{ github.run_id }}-attempt-1
+          path: ${{ env.DOWNLOAD_DIR }}
+          merge-multiple: false
+      - name: Validate and aggregate all shard evidence
+        id: validate
+        if: always()
+        shell: bash
+        timeout-minutes: 12
+        env:
+          EVENT_H_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          GUARD_RESULT: ${{ needs.guard.result }}
+          SHARDS_RESULT: ${{ needs.shards.result }}
+          DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          set +e
+          python3 - 2>&1 <<'PY' | tee "$EVIDENCE_DIR/aggregate.log"
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import sys
+
+          download = pathlib.Path(os.environ["DOWNLOAD_DIR"])
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          matrix = [
+              ("01", "core-unit-fast", "test/vitest/vitest.full-core-unit-fast.config.ts", 30, 75),
+              ("02", "core-unit-src", "test/vitest/vitest.full-core-unit-src.config.ts", 30, 75),
+              ("03", "core-unit-security", "test/vitest/vitest.full-core-unit-security.config.ts", 15, 60),
+              ("04", "core-unit-support", "test/vitest/vitest.full-core-unit-support.config.ts", 15, 60),
+              ("05", "core-support-boundary", "test/vitest/vitest.full-core-support-boundary.config.ts", 10, 55),
+              ("06", "core-tooling", "test/vitest/vitest.full-core-tooling.config.ts", 45, 90),
+              ("07", "core-contracts", "test/vitest/vitest.full-core-contracts.config.ts", 30, 75),
+              ("08", "core-bundled", "test/vitest/vitest.full-core-bundled.config.ts", 10, 55),
+              ("09", "core-runtime", "test/vitest/vitest.full-core-runtime.config.ts", 75, 120),
+              ("10", "agentic", "test/vitest/vitest.full-agentic.config.ts", 120, 165),
+              ("11", "auto-reply", "test/vitest/vitest.full-auto-reply.config.ts", 30, 75),
+              ("12", "extensions", "test/vitest/vitest.full-extensions.config.ts", 150, 195),
+          ]
+          expected = {
+              f"r7-h12-shard-{index}-{name}-P2-{os.environ['RUN_ID']}-attempt-1":
+                  (index, name, config, step_cap, job_cap)
+              for index, name, config, step_cap, job_cap in matrix
+          }
+          errors: list[str] = []
+          results = []
+          count_keys = [
+              "numTotalTests", "numPassedTests", "numFailedTests", "numPendingTests", "numTodoTests",
+              "numTotalTestSuites", "numPassedTestSuites", "numFailedTestSuites", "numPendingTestSuites",
+          ]
+          statuses = {"passed", "skipped", "pending", "todo"}
+          totals = {
+              "files": {
+                  "total": 0, "passed": 0, "failed": 0, "pending": 0,
+                  "skipped": 0, "todo": 0,
+              },
+              "tests": {
+                  "total": 0, "passed": 0, "failed": 0, "pending": 0,
+                  "skipped": 0, "todo": 0, "reportedPending": 0,
+              },
+              "suites": {
+                  "total": 0, "passed": 0, "failed": 0, "reportedPending": 0,
+              },
+              "runtime": {"source": "gnu-time-wall-clock", "sumWallClockMillis": 0},
+          }
+
+          def nonnegative_integer(value: object) -> bool:
+              return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+          if os.environ["GUARD_RESULT"] != "success":
+              errors.append(f"guard result is {os.environ['GUARD_RESULT']}")
+          if os.environ["SHARDS_RESULT"] != "success":
+              errors.append(f"matrix result is {os.environ['SHARDS_RESULT']}")
+          if os.environ["DOWNLOAD_OUTCOME"] != "success":
+              errors.append(f"download outcome is {os.environ['DOWNLOAD_OUTCOME']}")
+
+          directories = sorted(
+              [path for path in download.iterdir() if path.is_dir() and not path.is_symlink()],
+              key=lambda path: path.name,
+          ) if download.is_dir() and not download.is_symlink() else []
+          actual_names = [path.name for path in directories]
+          if len(actual_names) != 12 or len(set(actual_names)) != 12:
+              errors.append(f"artifact cardinality is {len(actual_names)}, expected 12 unique")
+          if set(actual_names) != set(expected):
+              errors.append(
+                  f"artifact names mismatch missing={sorted(set(expected)-set(actual_names))!r} "
+                  f"foreign={sorted(set(actual_names)-set(expected))!r}"
+              )
+
+          for directory in directories:
+              if directory.name not in expected:
+                  continue
+              index, name, config, step_cap, job_cap = expected[directory.name]
+              entries = sorted(directory.iterdir(), key=lambda path: path.name)
+              invalid = [path.name for path in entries if path.is_symlink() or not path.is_file()]
+              if invalid:
+                  errors.append(f"{directory.name}: non-regular evidence {invalid!r}")
+                  continue
+              manifest_path = directory / "manifest.json"
+              seal_path = directory / "seal.json"
+              if not manifest_path.is_file() or not seal_path.is_file():
+                  errors.append(f"{directory.name}: missing manifest or seal")
+                  continue
+              try:
+                  manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                  seal = json.loads(seal_path.read_text(encoding="utf-8"))
+              except Exception as exc:
+                  errors.append(f"{directory.name}: invalid JSON {exc}")
+                  continue
+              actual_hash_names = {path.name for path in entries if path.name != "seal.json"}
+              sealed = seal.get("files") if isinstance(seal, dict) else None
+              if not isinstance(seal, dict) or seal.get("algorithm") != "sha256" or not isinstance(sealed, dict):
+                  errors.append(f"{directory.name}: invalid seal shape")
+                  continue
+              if set(sealed) != actual_hash_names:
+                  errors.append(f"{directory.name}: seal file-set mismatch")
+              for file_name, expected_hash in sealed.items():
+                  path = directory / file_name
+                  if not path.is_file() or path.is_symlink():
+                      errors.append(f"{directory.name}: sealed file missing {file_name}")
+                      continue
+                  if hashlib.sha256(path.read_bytes()).hexdigest() != expected_hash:
+                      errors.append(f"{directory.name}: seal mismatch {file_name}")
+
+              checks = manifest.get("checks", {})
+              run = manifest.get("run", {})
+              payload = manifest.get("payload", {})
+              shard = manifest.get("matrix", {})
+              test_summary = manifest.get("testSummary", {})
+              counts = test_summary.get("counts", {}) if isinstance(test_summary, dict) else {}
+              file_cardinality = (
+                  test_summary.get("fileStatusCardinality", {}) if isinstance(test_summary, dict) else {}
+              )
+              assertion_cardinality = (
+                  test_summary.get("assertionStatusCardinality", {}) if isinstance(test_summary, dict) else {}
+              )
+              runtime = test_summary.get("runtime", {}) if isinstance(test_summary, dict) else {}
+              required_files = {
+                  "manifest.json", "seal.json", "finalstatus.json", "source.log", "source.exit",
+                  "test.log", "test.exit", "test.time", "test-results.json", "command.txt",
+                  "resource.log", "resource-after.log", "poststate.log", "test-disposition.json",
+              }
+              present = {path.name for path in entries}
+              shard_errors = []
+              if not required_files.issubset(present):
+                  shard_errors.append(f"required evidence missing {sorted(required_files-present)!r}")
+              if manifest.get("schema") != "openclaw.gateway-r7-h12-shard.v1":
+                  shard_errors.append("schema")
+              if manifest.get("disposition") != "SHARD_NATIVE_SUBSTITUTE":
+                  shard_errors.append("disposition")
+              if manifest.get("artifact", {}).get("name") != directory.name:
+                  shard_errors.append("artifact name")
+              if manifest.get("harness", {}).get("commit") != os.environ["EVENT_H_SHA"]:
+                  shard_errors.append("harness commit")
+              if payload.get("commit") != os.environ["P2_SHA"] or payload.get("tree") != os.environ["P2_TREE"]:
+                  shard_errors.append("payload identity")
+              if payload.get("parent") != os.environ["P_SHA"] or payload.get("base") != os.environ["BASE_SHA"]:
+                  shard_errors.append("payload ancestry")
+              if run != {
+                  "id": os.environ["RUN_ID"], "attempt": 1, "event": os.environ["EVENT_NAME"],
+                  "ref": os.environ["EVENT_REF"], "repository": os.environ["EVENT_REPOSITORY"],
+              }:
+                  shard_errors.append("run identity")
+              if shard != {
+                  "index": index, "name": name, "config": config,
+                  "testStepCapMinutes": step_cap, "jobCapMinutes": job_cap, "perTestTimeoutMs": 120000,
+              }:
+                  shard_errors.append("matrix binding")
+              if checks != {"source": "PASS", "test": "PASS", "resource": "PASS", "poststate": "PASS"}:
+                  shard_errors.append("checks")
+              if manifest.get("testDisposition") != {
+                  "status": "PASS", "timeout": "NO", "signal": "NONE", "exit": 0,
+              }:
+                  shard_errors.append("test disposition")
+              if manifest.get("final") != {"status": "PASS", "exit": 0}:
+                  shard_errors.append("final")
+              if manifest.get("errors") != []:
+                  shard_errors.append("errors")
+              summary_errors = []
+              if not nonnegative_integer(test_summary.get("files")) or test_summary.get("files", 0) <= 0:
+                  summary_errors.append("positive files")
+                  shard_errors.append("positive files")
+              if not nonnegative_integer(test_summary.get("assertions")) or test_summary.get("assertions", 0) <= 0:
+                  summary_errors.append("positive assertions")
+                  shard_errors.append("positive tests")
+              if not isinstance(counts, dict) or set(counts) != set(count_keys):
+                  summary_errors.append("count key set")
+                  shard_errors.append("count key set")
+              for key in count_keys:
+                  if not nonnegative_integer(counts.get(key)):
+                      summary_errors.append(f"count {key}")
+                      shard_errors.append(f"count {key}")
+              for label, cardinality in [
+                  ("file", file_cardinality), ("assertion", assertion_cardinality),
+              ]:
+                  if not isinstance(cardinality, dict) or set(cardinality) != statuses:
+                      summary_errors.append(f"{label} status key set")
+                      shard_errors.append(f"{label} status key set")
+                      continue
+                  for status, value in cardinality.items():
+                      if not nonnegative_integer(value):
+                          summary_errors.append(f"{label} status {status}")
+                          shard_errors.append(f"{label} status {status}")
+              if counts.get("numTotalTests", 0) <= 0 or counts.get("numPassedTests", 0) <= 0:
+                  summary_errors.append("positive pass counts")
+                  shard_errors.append("positive pass counts")
+              if counts.get("numFailedTests") != 0 or counts.get("numFailedTestSuites") != 0:
+                  summary_errors.append("null failures")
+                  shard_errors.append("null failures")
+              if test_summary.get("success") is not True:
+                  summary_errors.append("report success")
+                  shard_errors.append("report success")
+              if isinstance(assertion_cardinality, dict) and set(assertion_cardinality) == statuses:
+                  expected_test_counts = {
+                      "numTotalTests": sum(assertion_cardinality.values()),
+                      "numPassedTests": assertion_cardinality["passed"],
+                      "numFailedTests": 0,
+                      "numPendingTests": assertion_cardinality["skipped"] + assertion_cardinality["pending"],
+                      "numTodoTests": assertion_cardinality["todo"],
+                  }
+                  if any(counts.get(key) != value for key, value in expected_test_counts.items()):
+                      summary_errors.append("assertion/count coherence")
+                      shard_errors.append("assertion/count coherence")
+              if isinstance(file_cardinality, dict) and set(file_cardinality) == statuses:
+                  if sum(file_cardinality.values()) != test_summary.get("files"):
+                      summary_errors.append("file status cardinality")
+                      shard_errors.append("file status cardinality")
+                  if file_cardinality["passed"] <= 0:
+                      summary_errors.append("passed file cardinality")
+                      shard_errors.append("passed file cardinality")
+              if all(nonnegative_integer(counts.get(key)) for key in count_keys[5:]):
+                  suite_sum = (
+                      counts["numPassedTestSuites"]
+                      + counts["numFailedTestSuites"]
+                      + counts["numPendingTestSuites"]
+                  )
+                  if counts["numTotalTestSuites"] != suite_sum:
+                      summary_errors.append("suite count coherence")
+                      shard_errors.append("suite count coherence")
+                  if counts["numTotalTestSuites"] <= 0 or counts["numPassedTestSuites"] <= 0:
+                      summary_errors.append("positive suite counts")
+                      shard_errors.append("positive suite counts")
+              if test_summary.get("assertions") != counts.get("numTotalTests"):
+                  summary_errors.append("assertion total")
+                  shard_errors.append("assertion total")
+              if (
+                  not isinstance(runtime, dict)
+                  or runtime.get("source") != "gnu-time-wall-clock"
+                  or not nonnegative_integer(runtime.get("wallClockMillis"))
+              ):
+                  summary_errors.append("validated runtime")
+                  shard_errors.append("validated runtime")
+              if (directory / "test.exit").read_text(encoding="utf-8").strip() != "0":
+                  shard_errors.append("test exit")
+              normalized_summary = None
+              if not summary_errors:
+                  normalized_summary = {
+                      "files": {
+                          "total": test_summary["files"],
+                          "passed": file_cardinality["passed"],
+                          "failed": 0,
+                          "pending": file_cardinality["pending"],
+                          "skipped": file_cardinality["skipped"],
+                          "todo": file_cardinality["todo"],
+                      },
+                      "tests": {
+                          "total": counts["numTotalTests"],
+                          "passed": counts["numPassedTests"],
+                          "failed": counts["numFailedTests"],
+                          "pending": assertion_cardinality["pending"],
+                          "skipped": assertion_cardinality["skipped"],
+                          "todo": counts["numTodoTests"],
+                          "reportedPending": counts["numPendingTests"],
+                      },
+                      "suites": {
+                          "total": counts["numTotalTestSuites"],
+                          "passed": counts["numPassedTestSuites"],
+                          "failed": counts["numFailedTestSuites"],
+                          "reportedPending": counts["numPendingTestSuites"],
+                      },
+                      "runtime": {
+                          "source": "gnu-time-wall-clock",
+                          "wallClockMillis": runtime["wallClockMillis"],
+                      },
+                  }
+                  for category in totals["files"]:
+                      totals["files"][category] += normalized_summary["files"][category]
+                  for category in totals["tests"]:
+                      totals["tests"][category] += normalized_summary["tests"][category]
+                  for category in totals["suites"]:
+                      totals["suites"][category] += normalized_summary["suites"][category]
+                  totals["runtime"]["sumWallClockMillis"] += runtime["wallClockMillis"]
+              if shard_errors:
+                  errors.append(f"{directory.name}: {', '.join(shard_errors)}")
+              results.append({
+                  "artifact": directory.name, "index": index, "name": name, "config": config,
+                  "status": "PASS" if not shard_errors else "FAIL",
+                  "testSummary": normalized_summary,
+                  "manifestSha256": hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+                  "sealSha256": hashlib.sha256(seal_path.read_bytes()).hexdigest(),
+              })
+
+          recomputed = {
+              "files": {
+                  "total": 0, "passed": 0, "failed": 0, "pending": 0,
+                  "skipped": 0, "todo": 0,
+              },
+              "tests": {
+                  "total": 0, "passed": 0, "failed": 0, "pending": 0,
+                  "skipped": 0, "todo": 0, "reportedPending": 0,
+              },
+              "suites": {
+                  "total": 0, "passed": 0, "failed": 0, "reportedPending": 0,
+              },
+              "runtime": {"source": "gnu-time-wall-clock", "sumWallClockMillis": 0},
+          }
+          summaries = [item.get("testSummary") for item in results if isinstance(item.get("testSummary"), dict)]
+          for summary in summaries:
+              for surface in ["files", "tests", "suites"]:
+                  for category in recomputed[surface]:
+                      recomputed[surface][category] += summary[surface][category]
+              recomputed["runtime"]["sumWallClockMillis"] += summary["runtime"]["wallClockMillis"]
+          if len(summaries) != 12:
+              errors.append(f"validated shard summaries are {len(summaries)}, expected 12")
+          if recomputed != totals:
+              errors.append("aggregate totals do not match the 12 shard manifests")
+          if (
+              totals["files"]["failed"] != 0
+              or totals["tests"]["failed"] != 0
+              or totals["suites"]["failed"] != 0
+          ):
+              errors.append("aggregate failed counts must be zero")
+          if totals["tests"]["reportedPending"] != totals["tests"]["pending"] + totals["tests"]["skipped"]:
+              errors.append("aggregate reported pending tests are incoherent")
+          if totals["files"]["total"] != sum(
+              totals["files"][key] for key in ["passed", "failed", "pending", "skipped", "todo"]
+          ):
+              errors.append("aggregate file category sum is incoherent")
+          if totals["tests"]["total"] != sum(
+              totals["tests"][key] for key in ["passed", "failed", "pending", "skipped", "todo"]
+          ):
+              errors.append("aggregate test category sum is incoherent")
+          if totals["suites"]["total"] != (
+              totals["suites"]["passed"]
+              + totals["suites"]["failed"]
+              + totals["suites"]["reportedPending"]
+          ):
+              errors.append("aggregate suite category sum is incoherent")
+
+          passed_shards = sum(item["status"] == "PASS" for item in results)
+          passed = not errors and len(results) == 12 and passed_shards == 12
+          final = {"status": "PASS" if passed else "FAIL", "exit": 0 if passed else 1}
+          aggregate = {
+              "schema": "openclaw.gateway-r7-h12-aggregate.v1",
+              "disposition": "SHARD_NATIVE_SUBSTITUTE",
+              "payload": {"commit": os.environ["P2_SHA"], "tree": os.environ["P2_TREE"]},
+              "run": {"id": os.environ["RUN_ID"], "attempt": 1},
+              "expectedArtifacts": 12, "verifiedArtifacts": len(results),
+              "passedShards": passed_shards, "totals": totals,
+              "results": results, "errors": errors, "final": final,
+          }
+          (evidence / "shard-aggregate.json").write_text(
+              json.dumps(aggregate, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          (evidence / "finalstatus.json").write_text(
+              json.dumps(final, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"aggregate_status={final['status']}\n")
+          print(json.dumps({"final": final, "errors": errors}, sort_keys=True))
+          sys.exit(final["exit"])
+          PY
+          pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          rc="${pipeline_status[0]}"
+          if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/aggregate.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/aggregate.ended"
+          exit "$rc"
+
+      - name: Seal aggregate envelope
+        id: seal
+        if: always()
+        shell: bash
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          required = {"aggregate.log", "aggregate.started", "aggregate.ended", "aggregate.exit", "shard-aggregate.json", "finalstatus.json"}
+          entries = sorted(evidence.iterdir(), key=lambda path: path.name)
+          invalid = [path.name for path in entries if path.is_symlink() or not path.is_file()]
+          if invalid:
+              raise SystemExit(f"non-regular aggregate evidence: {invalid!r}")
+          final = json.loads((evidence / "finalstatus.json").read_text(encoding="utf-8"))
+          actual = {path.name for path in entries}
+          if final.get("status") == "PASS" and not required.issubset(actual):
+              raise SystemExit(f"PASS aggregate evidence missing: {sorted(required-actual)!r}")
+          hashes = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in entries}
+          (evidence / "seal.json").write_text(
+              json.dumps({"algorithm": "sha256", "files": hashes}, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Upload aggregate envelope
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: r7-h12-aggregate-P2-${{ github.run_id }}-attempt-1
+          path: ${{ env.EVIDENCE_DIR }}
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+  final:
+    name: H12 final workflow disposition
+    needs: [guard, shards, aggregate, build]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Initialize final envelope
+        id: initialize
+        shell: bash
+        timeout-minutes: 2
+        env:
+          DOWNLOAD_DIR_INIT: ${{ runner.temp }}/r7-h12-final-downloads
+          EVIDENCE_DIR_INIT: ${{ runner.temp }}/r7-h12-final
+        run: |
+          set -euo pipefail
+          test -n "${RUNNER_TEMP:-}"
+          test -n "${GITHUB_ENV:-}"
+          test "$DOWNLOAD_DIR_INIT" = "$RUNNER_TEMP/r7-h12-final-downloads"
+          test "$EVIDENCE_DIR_INIT" = "$RUNNER_TEMP/r7-h12-final"
+          DOWNLOAD_DIR="$DOWNLOAD_DIR_INIT"
+          EVIDENCE_DIR="$EVIDENCE_DIR_INIT"
+          printf 'DOWNLOAD_DIR=%s\n' "$DOWNLOAD_DIR" >> "$GITHUB_ENV"
+          printf 'EVIDENCE_DIR=%s\n' "$EVIDENCE_DIR" >> "$GITHUB_ENV"
+          test ! -e "$DOWNLOAD_DIR"
+          test ! -e "$EVIDENCE_DIR"
+          mkdir -p "$EVIDENCE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/final.started"
+      - name: Download all H12 evidence envelopes
+        id: download
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: r7-h12-*-P2-${{ github.run_id }}-attempt-1
+          path: ${{ env.DOWNLOAD_DIR }}
+          merge-multiple: false
+      - name: Validate workflow final disposition
+        id: validate
+        if: always()
+        shell: bash
+        timeout-minutes: 12
+        env:
+          EVENT_H_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          GUARD_RESULT: ${{ needs.guard.result }}
+          SHARDS_RESULT: ${{ needs.shards.result }}
+          AGGREGATE_RESULT: ${{ needs.aggregate.result }}
+          AGGREGATE_STATUS: ${{ needs.aggregate.outputs.aggregate_status }}
+          WORKFLOW_BLOB: ${{ needs.guard.outputs.workflow_blob }}
+          WORKFLOW_CONTENT_SHA256: ${{ needs.guard.outputs.workflow_content_sha256 }}
+          BUILD_RESULT: ${{ needs.build.result }}
+          BUILD_STATUS: ${{ needs.build.outputs.build_status }}
+          DOWNLOAD_OUTCOME: ${{ steps.download.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          set +e
+          python3 - 2>&1 <<'PY' | tee "$EVIDENCE_DIR/final.log"
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+          import sys
+
+          download = pathlib.Path(os.environ["DOWNLOAD_DIR"])
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          errors: list[str] = []
+
+          expected_shards = [
+              f"r7-h12-shard-{index:02d}-{name}-P2-{os.environ['RUN_ID']}-attempt-1"
+              for index, name in enumerate([
+                  "core-unit-fast", "core-unit-src", "core-unit-security", "core-unit-support",
+                  "core-support-boundary", "core-tooling", "core-contracts", "core-bundled",
+                  "core-runtime", "agentic", "auto-reply", "extensions",
+              ], 1)
+          ]
+          aggregate_name = f"r7-h12-aggregate-P2-{os.environ['RUN_ID']}-attempt-1"
+          build_name = f"r7-h12-build-P2-{os.environ['RUN_ID']}-attempt-1"
+          expected_names = set(expected_shards + [aggregate_name, build_name])
+
+          results = {
+              "guard": os.environ["GUARD_RESULT"],
+              "shards": os.environ["SHARDS_RESULT"],
+              "aggregate": os.environ["AGGREGATE_RESULT"],
+              "build": os.environ["BUILD_RESULT"],
+          }
+          for name, result in results.items():
+              if result != "success":
+                  errors.append(f"{name} job result is {result}")
+          if os.environ["AGGREGATE_STATUS"] != "PASS":
+              errors.append(f"aggregate status is {os.environ['AGGREGATE_STATUS'] or 'NOT_RUN'}")
+          if not re.fullmatch(r"[0-9a-f]{40}", os.environ.get("WORKFLOW_BLOB", "")):
+              errors.append("workflow blob binding missing")
+          if not re.fullmatch(r"[0-9a-f]{64}", os.environ.get("WORKFLOW_CONTENT_SHA256", "")):
+              errors.append("workflow content hash binding missing")
+          if os.environ["BUILD_STATUS"] != "PASS":
+              errors.append(f"build status is {os.environ['BUILD_STATUS'] or 'NOT_RUN'}")
+          if os.environ["DOWNLOAD_OUTCOME"] != "success":
+              errors.append(f"download outcome is {os.environ['DOWNLOAD_OUTCOME']}")
+
+          directories = sorted(
+              [path for path in download.iterdir() if path.is_dir() and not path.is_symlink()],
+              key=lambda path: path.name,
+          ) if download.is_dir() and not download.is_symlink() else []
+          actual_names = {path.name for path in directories}
+          if len(directories) != 14 or actual_names != expected_names:
+              errors.append(
+                  f"final artifact set mismatch count={len(directories)} "
+                  f"missing={sorted(expected_names-actual_names)!r} foreign={sorted(actual_names-expected_names)!r}"
+              )
+
+          def verified_json(directory_name: str, file_name: str) -> dict | None:
+              directory = download / directory_name
+              if not directory.is_dir() or directory.is_symlink():
+                  errors.append(f"missing artifact directory {directory_name}")
+                  return None
+              entries = sorted(directory.iterdir(), key=lambda path: path.name)
+              invalid = [path.name for path in entries if path.is_symlink() or not path.is_file()]
+              if invalid:
+                  errors.append(f"{directory_name}: non-regular evidence {invalid!r}")
+                  return None
+              seal_path = directory / "seal.json"
+              target_path = directory / file_name
+              if not seal_path.is_file() or not target_path.is_file():
+                  errors.append(f"{directory_name}: missing seal or {file_name}")
+                  return None
+              try:
+                  seal = json.loads(seal_path.read_text(encoding="utf-8"))
+                  target = json.loads(target_path.read_text(encoding="utf-8"))
+              except Exception as exc:
+                  errors.append(f"{directory_name}: invalid JSON {exc}")
+                  return None
+              sealed = seal.get("files") if isinstance(seal, dict) else None
+              actual_hash_names = {path.name for path in entries if path.name != "seal.json"}
+              if not isinstance(sealed, dict) or seal.get("algorithm") != "sha256" or set(sealed) != actual_hash_names:
+                  errors.append(f"{directory_name}: invalid seal contract")
+                  return None
+              for name, expected_hash in sealed.items():
+                  path = directory / name
+                  if hashlib.sha256(path.read_bytes()).hexdigest() != expected_hash:
+                      errors.append(f"{directory_name}: hash mismatch {name}")
+              return target if isinstance(target, dict) else None
+
+          aggregate = verified_json(aggregate_name, "shard-aggregate.json")
+          build = verified_json(build_name, "manifest.json")
+          if aggregate is not None:
+              if aggregate.get("schema") != "openclaw.gateway-r7-h12-aggregate.v1":
+                  errors.append("aggregate schema")
+              if aggregate.get("disposition") != "SHARD_NATIVE_SUBSTITUTE":
+                  errors.append("aggregate disposition")
+              if aggregate.get("payload") != {"commit": os.environ["P2_SHA"], "tree": os.environ["P2_TREE"]}:
+                  errors.append("aggregate payload")
+              if aggregate.get("run") != {"id": os.environ["RUN_ID"], "attempt": 1}:
+                  errors.append("aggregate run")
+              if aggregate.get("expectedArtifacts") != 12 or aggregate.get("verifiedArtifacts") != 12:
+                  errors.append("aggregate cardinality")
+              if aggregate.get("passedShards") != 12 or aggregate.get("errors") != []:
+                  errors.append("aggregate shard PASS contract")
+              totals = aggregate.get("totals", {})
+              file_totals = totals.get("files", {}) if isinstance(totals, dict) else {}
+              test_totals = totals.get("tests", {}) if isinstance(totals, dict) else {}
+              suite_totals = totals.get("suites", {}) if isinstance(totals, dict) else {}
+              runtime_totals = totals.get("runtime", {}) if isinstance(totals, dict) else {}
+              aggregate_results = aggregate.get("results")
+              if not isinstance(aggregate_results, list) or len(aggregate_results) != 12:
+                  errors.append("aggregate results cardinality")
+                  aggregate_results = []
+              for result in aggregate_results:
+                  if not isinstance(result, dict):
+                      errors.append("aggregate result shape")
+                      continue
+                  summary = result.get("testSummary", {})
+                  if result.get("status") != "PASS":
+                      errors.append("aggregate result status")
+                  if not isinstance(summary, dict):
+                      errors.append("aggregate result summary shape")
+                      continue
+                  if (
+                      set(summary.get("files", {})) != {"total", "passed", "failed", "pending", "skipped", "todo"}
+                      or set(summary.get("tests", {}))
+                      != {"total", "passed", "failed", "pending", "skipped", "todo", "reportedPending"}
+                      or set(summary.get("suites", {})) != {"total", "passed", "failed", "reportedPending"}
+                  ):
+                      errors.append("aggregate result separated schema")
+                      continue
+                  shard_files = summary["files"]
+                  shard_tests = summary["tests"]
+                  shard_suites = summary["suites"]
+                  shard_runtime = summary.get("runtime", {})
+                  if any(
+                      not isinstance(value, int) or isinstance(value, bool) or value < 0
+                      for surface in [shard_files, shard_tests, shard_suites]
+                      for value in surface.values()
+                  ):
+                      errors.append("aggregate result non-negative counts")
+                      continue
+                  if shard_files["failed"] != 0 or shard_tests["failed"] != 0 or shard_suites["failed"] != 0:
+                      errors.append("aggregate result failures")
+                  if shard_files["total"] != sum(
+                      shard_files[key] for key in ["passed", "failed", "pending", "skipped", "todo"]
+                  ):
+                      errors.append("aggregate result file coherence")
+                  if shard_tests["total"] != sum(
+                      shard_tests[key] for key in ["passed", "failed", "pending", "skipped", "todo"]
+                  ) or shard_tests["reportedPending"] != shard_tests["pending"] + shard_tests["skipped"]:
+                      errors.append("aggregate result test coherence")
+                  if shard_suites["total"] != (
+                      shard_suites["passed"] + shard_suites["failed"] + shard_suites["reportedPending"]
+                  ):
+                      errors.append("aggregate result suite coherence")
+                  if min(shard_files["total"], shard_files["passed"], shard_tests["total"], shard_tests["passed"], shard_suites["total"], shard_suites["passed"]) <= 0:
+                      errors.append("aggregate result positive counts")
+                  if (
+                      not isinstance(shard_runtime, dict)
+                      or shard_runtime.get("source") != "gnu-time-wall-clock"
+                      or not isinstance(shard_runtime.get("wallClockMillis"), int)
+                      or isinstance(shard_runtime.get("wallClockMillis"), bool)
+                      or shard_runtime.get("wallClockMillis", -1) < 0
+                  ):
+                      errors.append("aggregate result runtime")
+              if (
+                  set(file_totals) != {"total", "passed", "failed", "pending", "skipped", "todo"}
+                  or set(test_totals) != {"total", "passed", "failed", "pending", "skipped", "todo", "reportedPending"}
+                  or set(suite_totals) != {"total", "passed", "failed", "reportedPending"}
+                  or any(not isinstance(value, int) or isinstance(value, bool) or value < 0 for value in file_totals.values())
+                  or any(not isinstance(value, int) or isinstance(value, bool) or value < 0 for value in test_totals.values())
+                  or any(not isinstance(value, int) or isinstance(value, bool) or value < 0 for value in suite_totals.values())
+              ):
+                  errors.append("aggregate count totals")
+              else:
+                  if file_totals["failed"] != 0 or test_totals["failed"] != 0 or suite_totals["failed"] != 0:
+                      errors.append("aggregate failures are nonzero")
+                  if min(file_totals["total"], file_totals["passed"], test_totals["total"], test_totals["passed"], suite_totals["total"], suite_totals["passed"]) <= 0:
+                      errors.append("aggregate positive totals")
+                  if file_totals["total"] != sum(
+                      file_totals[key] for key in ["passed", "failed", "pending", "skipped", "todo"]
+                  ):
+                      errors.append("aggregate file total coherence")
+                  if test_totals["total"] != sum(
+                      test_totals[key] for key in ["passed", "failed", "pending", "skipped", "todo"]
+                  ):
+                      errors.append("aggregate test total coherence")
+                  if test_totals["reportedPending"] != test_totals["pending"] + test_totals["skipped"]:
+                      errors.append("aggregate reported pending test coherence")
+                  if suite_totals["total"] != (
+                      suite_totals["passed"] + suite_totals["failed"] + suite_totals["reportedPending"]
+                  ):
+                      errors.append("aggregate suite total coherence")
+              if (
+                  runtime_totals.get("source") != "gnu-time-wall-clock"
+                  or not isinstance(runtime_totals.get("sumWallClockMillis"), int)
+                  or isinstance(runtime_totals.get("sumWallClockMillis"), bool)
+                  or runtime_totals.get("sumWallClockMillis", -1) < 0
+              ):
+                  errors.append("aggregate runtime total")
+              if aggregate.get("final") != {"status": "PASS", "exit": 0}:
+                  errors.append("aggregate final")
+          if build is not None:
+              if build.get("schema") != "openclaw.gateway-r7-h12-build.v1":
+                  errors.append("build schema")
+              if build.get("disposition") != "SHARD_NATIVE_SUBSTITUTE":
+                  errors.append("build disposition")
+              if build.get("payload") != {
+                  "commit": os.environ["P2_SHA"], "tree": os.environ["P2_TREE"],
+                  "parent": os.environ["P_SHA"], "base": os.environ["BASE_SHA"],
+              }:
+                  errors.append("build payload")
+              if build.get("run") != {"id": os.environ["RUN_ID"], "attempt": 1}:
+                  errors.append("build run")
+              if build.get("commands") != {"frozenInstalls": 1, "buildRuns": 1, "build": "pnpm build"}:
+                  errors.append("exactly one build command")
+              if build.get("caps") != {"buildStepMinutes": 120, "jobMinutes": 180}:
+                  errors.append("build caps")
+              if build.get("checks") != {
+                  "source": "PASS", "resource": "PASS", "build": "PASS", "poststate": "PASS",
+              }:
+                  errors.append("build checks")
+              if build.get("errors") != [] or build.get("final") != {"status": "PASS", "exit": 0}:
+                  errors.append("build final")
+              outputs = build.get("buildOutputs", {})
+              if not isinstance(outputs.get("count"), int) or outputs.get("count", 0) <= 0:
+                  errors.append("build output count")
+              if not isinstance(outputs.get("bytes"), int) or outputs.get("bytes", 0) <= 0:
+                  errors.append("build output bytes")
+              if not isinstance(outputs.get("contentManifestSha256"), str) or len(outputs.get("contentManifestSha256", "")) != 64:
+                  errors.append("build output content hash")
+              build_exit = download / build_name / "build.exit"
+              post_exit = download / build_name / "poststate.exit"
+              if not build_exit.is_file() or build_exit.read_text(encoding="utf-8").strip() != "0":
+                  errors.append("build exit is not zero")
+              if not post_exit.is_file() or post_exit.read_text(encoding="utf-8").strip() != "0":
+                  errors.append("build poststate exit is not zero")
+              source_hash_path = download / build_name / "buildoutputs.sha256.json"
+              if source_hash_path.is_file() and not source_hash_path.is_symlink():
+                  (evidence / "buildhashmanifest.json").write_bytes(source_hash_path.read_bytes())
+              else:
+                  errors.append("missing build hash manifest")
+          if not (evidence / "buildhashmanifest.json").is_file():
+              (evidence / "buildhashmanifest.json").write_text(
+                  json.dumps({"status": "NOT_RUN"}, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+              )
+
+          passed = not errors
+          final = {
+              "status": "PASS" if passed else "FAIL",
+              "exit": 0 if passed else 1,
+              "build": (
+                  "PASS" if os.environ["BUILD_RESULT"] == "success"
+                  else "NOT_RUN" if os.environ["BUILD_RESULT"] == "skipped"
+                  else "FAIL"
+              ),
+          }
+          (evidence / "finalstatus.json").write_text(
+              json.dumps(final, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          manifest = {
+              "schema": "openclaw.gateway-r7-h12-final.v1",
+              "disposition": "SHARD_NATIVE_SUBSTITUTE",
+              "harness": {
+                  "commit": os.environ["EVENT_H_SHA"], "parent": os.environ["P2_SHA"],
+                  "workflowPath": os.environ["WORKFLOW_PATH"],
+                  "workflowBlobSha": os.environ.get("WORKFLOW_BLOB"),
+                  "workflowContentSha256": os.environ.get("WORKFLOW_CONTENT_SHA256"),
+              },
+              "payload": {
+                  "commit": os.environ["P2_SHA"], "tree": os.environ["P2_TREE"],
+                  "parent": os.environ["P_SHA"], "base": os.environ["BASE_SHA"],
+                  "incrementalDiffSha256": os.environ["INCREMENTAL_DIFF_SHA256"],
+                  "cumulativeDiffSha256": os.environ["CUMULATIVE_DIFF_SHA256"],
+              },
+              "run": {
+                  "id": os.environ["RUN_ID"], "attempt": int(os.environ["RUN_ATTEMPT"]),
+                  "event": os.environ["EVENT_NAME"], "ref": os.environ["EVENT_REF"],
+                  "repository": os.environ["EVENT_REPOSITORY"],
+              },
+              "contracts": {
+                  "shards": 12, "shardInvocations": 12, "frozenInstalls": 13,
+                  "buildRuns": 1, "literalPnpmTestClaim": False, "perTestTimeoutMs": 120000,
+              },
+              "jobs": results,
+              "riskHistory": {
+                  "H8": {
+                      "commit": "76453656879f34832464bbb72aa55669e2ce9e69",
+                      "runId": "31139925770", "jobId": "92747472414", "artifactId": "8981305464",
+                      "disposition": "INCOMPLETE_FAILURE",
+                  },
+                  "A3": {
+                      "commit": "3f274910a5e61edccf1f60d860bd5c59edd2ac09",
+                      "tree": "bc4b55997fa634d83ba043e6390bf41a9a907fdd",
+                      "runId": "31258069291", "jobId": "93104447937", "artifactId": "9021992888",
+                      "artifactDigestSha256": "345a47b2b3e128a391fb08a2bbdde4d7a7088f8139414be80c437f1769507a7a",
+                      "manifestSha256": "f5dce8e424b344f302e921bafa567884595d4cf13057c30cad65fe99dd6b6381",
+                      "formal": "UNKNOWN", "independent": "BOTH_PASS_HISTORICAL_INSTABILITY",
+                  },
+                  "H9": {
+                      "commit": "01f7c3e1dcffcc955c5fd402b7bb1e276b5e7ea7",
+                      "tree": "f501fec60285bddd80e9bad888971b7c1233704e",
+                      "runId": "31258811509", "jobId": "93106293933", "artifactId": "9024410645",
+                      "artifactDigestSha256": "7fa051cfc01a4dda1cf42600b07c147965c37240038d6786b436b8dd8a431a5d",
+                      "manifestSha256": "702809eaad24042a0f54a7fd68ec1da4b1c4dd94ae496b63e80ed4e6237acbe4",
+                      "disposition": "INCOMPLETE_FAILURE",
+                  },
+                  "B1": {
+                      "commit": "cd964a9cc8ab027f742fd4a3f5e4b6aa30589f72",
+                      "tree": "34ce4c44b59bf5965c0d0557b36e5d6be71d4ce4",
+                      "runId": "31283872306", "jobId": "93169380687", "artifactId": "9029251646",
+                      "artifactDigestSha256": "d389dbc07ff851f43cc26c295e85be4e6408dbaa2c28e004bc82820ffa4eefee",
+                      "manifestSha256": "782e3bc15062938b9558fd1e34bddebc3d70c5120c3cc6b59ee50ff560afb07a",
+                      "formal": "BOTH_PASS",
+                      "note": "target.fullName wrong; concrete H9 assertion PASS only in sealed raw JSON",
+                  },
+              },
+              "aggregate": aggregate, "build": build, "errors": errors, "final": final,
+          }
+          (evidence / "manifest.json").write_text(
+              json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps({"final": final, "errors": errors}, sort_keys=True))
+          sys.exit(final["exit"])
+          PY
+          pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          rc="${pipeline_status[0]}"
+          if test "$rc" -eq 0; then rc="${pipeline_status[1]}"; fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/final.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/final.ended"
+          exit "$rc"
+      - name: Seal final manifest and logs
+        id: seal
+        if: always()
+        shell: bash
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          required = {
+              "buildhashmanifest.json", "final.ended", "final.exit", "final.log",
+              "final.started", "finalstatus.json", "manifest.json",
+          }
+          entries = sorted(evidence.iterdir(), key=lambda path: path.name)
+          invalid = [path.name for path in entries if path.is_symlink() or not path.is_file()]
+          if invalid:
+              raise SystemExit(f"non-regular final evidence: {invalid!r}")
+          actual = {path.name for path in entries}
+          if not required.issubset(actual):
+              raise SystemExit(f"final evidence missing: {sorted(required-actual)!r}")
+          hashes = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in entries}
+          (evidence / "seal.json").write_text(
+              json.dumps({
+                  "algorithm": "sha256",
+                  "files": hashes,
+                  "sealContainer": "seal.json",
+                  "artifactFiles": sorted([*hashes, "seal.json"]),
+              }, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Verify final seal and exact upload file set
+        id: verify_seal
+        if: always()
+        shell: bash
+        timeout-minutes: 4
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          seal_path = evidence / "seal.json"
+          if not seal_path.is_file() or seal_path.is_symlink():
+              raise SystemExit("final seal missing or non-regular")
+          entries = sorted(evidence.iterdir(), key=lambda path: path.name)
+          invalid = [path.name for path in entries if path.is_symlink() or not path.is_file()]
+          if invalid:
+              raise SystemExit(f"non-regular final upload entry: {invalid!r}")
+          actual = {path.name for path in entries}
+          seal = json.loads(seal_path.read_text(encoding="utf-8"))
+          files = seal.get("files") if isinstance(seal, dict) else None
+          artifact_files = seal.get("artifactFiles") if isinstance(seal, dict) else None
+          if seal.get("algorithm") != "sha256" or seal.get("sealContainer") != "seal.json":
+              raise SystemExit("invalid final seal metadata")
+          if not isinstance(files, dict) or not isinstance(artifact_files, list):
+              raise SystemExit("invalid final seal file-set shape")
+          if set(files) != actual - {"seal.json"}:
+              raise SystemExit("seal.files does not bind the complete non-self-referential evidence set")
+          if set(artifact_files) != actual or len(artifact_files) != len(actual):
+              raise SystemExit("artifactFiles does not exactly match the upload directory")
+          for name, expected_hash in files.items():
+              if not isinstance(expected_hash, str) or len(expected_hash) != 64:
+                  raise SystemExit(f"invalid sealed hash for {name}")
+              if hashlib.sha256((evidence / name).read_bytes()).hexdigest() != expected_hash:
+                  raise SystemExit(f"final seal hash mismatch: {name}")
+          PY
+      - name: Upload final H12 envelope
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: r7-h12-final-P2-${{ github.run_id }}-attempt-1
+          path: ${{ env.EVIDENCE_DIR }}
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
