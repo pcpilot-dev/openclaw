@@ -1,0 +1,1262 @@
+name: Gateway r7 Watchdog Diagnostic D2 · DIAGNOSTIC_ONLY
+run-name: Gateway r7 D2 · DIAGNOSTIC_ONLY · run ${{ github.run_id }} attempt ${{ github.run_attempt }}
+
+on:
+  push:
+    branches:
+      - codex/evidence-gateway-r7-watchdog-diagnostic-d2
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r7-watchdog-diagnostic-d2
+  cancel-in-progress: false
+
+env:
+  BASE_SHA: 435e341a6ccd3db1f0d07504931f32385d10d6df
+  BASE_TREE: 916f825917a49da59c180a4cdabec3f0ce08227e
+  P_SHA: 7b89bf143d3c63e916847d58b92b5727fc16e4ca
+  P_TREE: 5f9eef5fd0c3e496910e2b3ab9db31023a43ca94
+  P2_SHA: 7492177a7068ca7481dd355f37b2d7a21630e9bc
+  P2_TREE: 39349f53cf8b6e5fbed55c8769ed5e5905965894
+  EXPECTED_REPOSITORY: pcpilot-dev/openclaw
+  EXPECTED_REF: refs/heads/codex/evidence-gateway-r7-watchdog-diagnostic-d2
+  WORKFLOW_PATH: .github/workflows/r7-watchdog-diagnostic-d2.yml
+  EXPECTED_H_PARENT: 7492177a7068ca7481dd355f37b2d7a21630e9bc
+  EXPECTED_H_MESSAGE: "ci: harden gateway r7 watchdog diagnostics d2"
+  EXPECTED_H_ADDITIONS: "1262"
+  PACKAGE_BLOB_SHA: f63ea7030f84032ec3021b3459084655dd584e9a
+  LOCK_BLOB_SHA: e9940a0c1404b1b6c584701351a93282f12bab77
+  RUN_VITEST_BLOB_SHA: 4f8b6d1abd0c94016f6c5f56f05ce219e8d9dfaa
+  SHARDS_BLOB_SHA: 7b0154d3cb15713b2ee138c5b15fddfecb6ca1fc
+  PROJECT_SHARD_CONFIG_BLOB_SHA: 743bd62ecd2fdc02e44edc8014d254f5d2b375a5
+  SHARED_CONFIG_BLOB_SHA: 9c5342e3498633bc72a29b9639ac620b799f73f9
+  TIMEOUTS_BLOB_SHA: 5816139df0ac52117d330775267298a08082017a
+  EXPECTED_PACKAGE_MANAGER: pnpm@11.15.1+sha512.81350b07e53c9538a02f1f2303b4290fa2d7be04e56e2a970c4cc4b417dc761de196edabd49d55c7dc9580db81007c44143e4e3d7e462b3000d23c255122d065
+  EXPECTED_PNPM_VERSION: 11.15.1
+  EXPECTED_NODE_VERSION: 24.15.0
+  CI: "true"
+  NODE_OPTIONS: --max-old-space-size=8192
+  OPENCLAW_VITEST_MAX_WORKERS: "2"
+
+jobs:
+  diagnostic:
+    name: D2 ${{ matrix.index }} · ${{ matrix.id }} · DIAGNOSTIC_ONLY
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ matrix.job_timeout_minutes }}
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - index: "01"
+            id: core-tooling
+            config: test/vitest/vitest.full-core-tooling.config.ts
+            config_blob: 221e38c68aebf78c01239bfab0e50c771d37e93a
+            silence_cap_ms: 120000
+            heartbeat_ms: 30000
+            step_timeout_minutes: 45
+            job_timeout_minutes: 90
+          - index: "02"
+            id: agentic
+            config: test/vitest/vitest.full-agentic.config.ts
+            config_blob: ae3bb10356cf450df13ac55acd0e2e970e148cc1
+            silence_cap_ms: 300000
+            heartbeat_ms: 30000
+            step_timeout_minutes: 120
+            job_timeout_minutes: 165
+    env:
+      DIAGNOSTIC_INDEX: ${{ matrix.index }}
+      DIAGNOSTIC_ID: ${{ matrix.id }}
+      BOUND_CONFIG: ${{ matrix.config }}
+      BOUND_CONFIG_BLOB_SHA: ${{ matrix.config_blob }}
+      WATCHDOG_SILENCE_CAP_MS: ${{ matrix.silence_cap_ms }}
+      WATCHDOG_HEARTBEAT_MS: ${{ matrix.heartbeat_ms }}
+      STEP_TIMEOUT_MINUTES: ${{ matrix.step_timeout_minutes }}
+      JOB_TIMEOUT_MINUTES: ${{ matrix.job_timeout_minutes }}
+
+    steps:
+      - name: Initialize diagnostic evidence and fresh store
+        id: initialize
+        env:
+          EVIDENCE_DIR_INIT: ${{ runner.temp }}/r7-watchdog-d2-${{ matrix.index }}-${{ matrix.id }}-evidence
+          PNPM_STORE_DIR_INIT: ${{ runner.temp }}/r7-watchdog-d2-${{ matrix.index }}-${{ matrix.id }}-store
+          RUNNER_ENVIRONMENT_INIT: ${{ runner.environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$RUNNER_ENVIRONMENT_INIT" = "github-hosted"
+          test "$RUNNER_OS" = "Linux"
+          test "$RUNNER_ARCH" = "X64"
+          test -n "${ImageOS:-}"
+          test -n "${ImageVersion:-}"
+          test "$EVIDENCE_DIR_INIT" = "$RUNNER_TEMP/r7-watchdog-d2-$DIAGNOSTIC_INDEX-$DIAGNOSTIC_ID-evidence"
+          test "$PNPM_STORE_DIR_INIT" = "$RUNNER_TEMP/r7-watchdog-d2-$DIAGNOSTIC_INDEX-$DIAGNOSTIC_ID-store"
+          test ! -e "$EVIDENCE_DIR_INIT"
+          test ! -e "$PNPM_STORE_DIR_INIT"
+          mkdir -p "$EVIDENCE_DIR_INIT"
+          EVIDENCE_DIR="$EVIDENCE_DIR_INIT"
+          PNPM_STORE_DIR="$PNPM_STORE_DIR_INIT"
+          BOUND_JSON="$EVIDENCE_DIR/reporter.json"
+          STDOUT_LOG="$EVIDENCE_DIR/test.stdout.log"
+          STDERR_LOG="$EVIDENCE_DIR/test.stderr.log"
+          printf 'EVIDENCE_DIR=%s\n' "$EVIDENCE_DIR" >> "$GITHUB_ENV"
+          printf 'PNPM_STORE_DIR=%s\n' "$PNPM_STORE_DIR" >> "$GITHUB_ENV"
+          printf 'BOUND_JSON=%s\n' "$BOUND_JSON" >> "$GITHUB_ENV"
+          printf 'STDOUT_LOG=%s\n' "$STDOUT_LOG" >> "$GITHUB_ENV"
+          printf 'STDERR_LOG=%s\n' "$STDERR_LOG" >> "$GITHUB_ENV"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/job.started"
+          : > "$STDOUT_LOG"
+          : > "$STDERR_LOG"
+          printf '%s\n' "DIAGNOSTIC_ONLY" > "$EVIDENCE_DIR/disposition.txt"
+          printf '%s\n' "$GITHUB_RUN_ID" > "$EVIDENCE_DIR/run.id"
+          printf '%s\n' "$GITHUB_RUN_ATTEMPT" > "$EVIDENCE_DIR/run.attempt"
+          printf '%s\n' "$GITHUB_SHA" > "$EVIDENCE_DIR/harness.event-sha"
+          printf '%s\n' "$GITHUB_REF" > "$EVIDENCE_DIR/event.ref"
+          printf '%s\n' "$RUNNER_ENVIRONMENT_INIT" > "$EVIDENCE_DIR/runner.environment"
+          printf '%s\n' "$RUNNER_OS" > "$EVIDENCE_DIR/runner.os"
+          printf '%s\n' "$RUNNER_ARCH" > "$EVIDENCE_DIR/runner.arch"
+          printf '%s\n' "$ImageOS" > "$EVIDENCE_DIR/runner.image-os"
+          printf '%s\n' "$ImageVersion" > "$EVIDENCE_DIR/runner.image-version"
+
+      - name: Checkout credential-free event harness commit
+        id: harness_checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Guard event harness identity, parent, scope, and runner
+        id: harness_guard
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REPOSITORY: ${{ github.repository }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_ATTEMPT: ${{ github.run_attempt }}
+          EVENT_ACTOR: ${{ github.actor }}
+          EVENT_SHA: ${{ github.sha }}
+          EVENT_WORKFLOW_REF: ${{ github.workflow_ref }}
+          EVENT_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          RUNNER_ENVIRONMENT_GUARD: ${{ runner.environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/harness-guard.started"
+          test "$EVENT_NAME" = "push"
+          test "$EVENT_REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$EVENT_REF" = "$EXPECTED_REF"
+          test "$EVENT_ATTEMPT" = "1"
+          test -n "$EVENT_ACTOR"
+          test "$EVENT_WORKFLOW_REF" = "$EXPECTED_REPOSITORY/$WORKFLOW_PATH@$EXPECTED_REF"
+          test "$EVENT_WORKFLOW_SHA" = "$EVENT_SHA"
+          test "$RUNNER_ENVIRONMENT_GUARD" = "github-hosted"
+          test "$RUNNER_ENVIRONMENT_GUARD" = "$(cat "$EVIDENCE_DIR/runner.environment")"
+          test "$RUNNER_OS" = "Linux"
+          test "$RUNNER_ARCH" = "X64"
+          test "$RUNNER_OS" = "$(cat "$EVIDENCE_DIR/runner.os")"
+          test "$RUNNER_ARCH" = "$(cat "$EVIDENCE_DIR/runner.arch")"
+          test -n "${ImageOS:-}"
+          test -n "${ImageVersion:-}"
+          test "$ImageOS" = "$(cat "$EVIDENCE_DIR/runner.image-os")"
+          test "$ImageVersion" = "$(cat "$EVIDENCE_DIR/runner.image-version")"
+          test "$(git rev-parse HEAD)" = "$EVENT_SHA"
+          test "$(git rev-parse HEAD)" = "$EVENT_WORKFLOW_SHA"
+          test "$(git rev-list --parents -n 1 HEAD | awk '{print NF}')" = "2"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_H_PARENT"
+          test "$(git show -s --format=%s HEAD)" = "$EXPECTED_H_MESSAGE"
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD | wc -l | tr -d ' ')" = "1"
+          test "$(git diff-tree --no-commit-id --name-status -r HEAD)" = $'A\t'"$WORKFLOW_PATH"
+          test "$(git diff --numstat "$EXPECTED_H_PARENT" HEAD -- "$WORKFLOW_PATH")" = "$EXPECTED_H_ADDITIONS"$'\t0\t'"$WORKFLOW_PATH"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          printf '%s\n' "$EVENT_SHA" > "$EVIDENCE_DIR/harness.head"
+          printf '%s\n' "$EXPECTED_H_PARENT" > "$EVIDENCE_DIR/harness.parent"
+          printf '%s\n' "$EXPECTED_H_MESSAGE" > "$EVIDENCE_DIR/harness.message"
+          printf '%s\t0\t%s\n' "$EXPECTED_H_ADDITIONS" "$WORKFLOW_PATH" > "$EVIDENCE_DIR/harness.numstat"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/harness-guard.ended"
+
+      - name: Checkout detached P2 source after harness guard
+        id: source_checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: 7492177a7068ca7481dd355f37b2d7a21630e9bc
+          fetch-depth: 3
+          persist-credentials: false
+
+      - name: Guard detached P2 and bound source blobs
+        id: source_guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/guard.started"
+          test "$(git rev-parse HEAD)" = "$P2_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$P2_TREE"
+          test "$(git rev-parse HEAD^)" = "$P_SHA"
+          test "$(git rev-parse HEAD^^)" = "$BASE_SHA"
+          test "$(git rev-parse "$P_SHA^{tree}")" = "$P_TREE"
+          test "$(git rev-parse "$BASE_SHA^{tree}")" = "$BASE_TREE"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          test "$(git hash-object package.json)" = "$PACKAGE_BLOB_SHA"
+          test "$(git hash-object pnpm-lock.yaml)" = "$LOCK_BLOB_SHA"
+          test "$(git hash-object scripts/run-vitest.mjs)" = "$RUN_VITEST_BLOB_SHA"
+          test "$(git hash-object test/vitest/vitest.test-shards.mjs)" = "$SHARDS_BLOB_SHA"
+          test "$(git hash-object test/vitest/vitest.project-shard-config.ts)" = "$PROJECT_SHARD_CONFIG_BLOB_SHA"
+          test "$(git hash-object test/vitest/vitest.shared.config.ts)" = "$SHARED_CONFIG_BLOB_SHA"
+          test "$(git hash-object test/vitest/vitest.timeouts.ts)" = "$TIMEOUTS_BLOB_SHA"
+          test "$(git hash-object "$BOUND_CONFIG")" = "$BOUND_CONFIG_BLOB_SHA"
+          test "$(node -p "require('./package.json').packageManager")" = "$EXPECTED_PACKAGE_MANAGER"
+          test "$(sed -n 's/^export const DEFAULT_VITEST_TEST_TIMEOUT_MS = \([0-9_]*\);$/\1/p' test/vitest/vitest.timeouts.ts | tr -d _ )" = "120000"
+          printf '%s\n' "$P2_SHA" > "$EVIDENCE_DIR/guard.head"
+          printf '%s\n' "$P2_TREE" > "$EVIDENCE_DIR/guard.tree"
+          printf '%s\n' "$P_SHA" > "$EVIDENCE_DIR/guard.parent"
+          printf '%s\n' "$BOUND_CONFIG" > "$EVIDENCE_DIR/config.path"
+          printf '%s\n' "$BOUND_CONFIG_BLOB_SHA" > "$EVIDENCE_DIR/config.blob"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/guard.ended"
+
+      - name: Set up exact Node 24.15.0
+        id: setup_node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24.15.0
+          check-latest: false
+
+      - name: Bind exact pnpm and fresh store
+        id: bind_pnpm
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node --version)" = "v$EXPECTED_NODE_VERSION"
+          test "$(node -p "require('./package.json').packageManager")" = "$EXPECTED_PACKAGE_MANAGER"
+          test ! -e "$PNPM_STORE_DIR"
+          mkdir -p "$PNPM_STORE_DIR"
+          corepack enable
+          corepack prepare "$EXPECTED_PACKAGE_MANAGER" --activate
+          test "$(pnpm --version)" = "$EXPECTED_PNPM_VERSION"
+          printf '%s\n' "$(node --version)" > "$EVIDENCE_DIR/node.version"
+          printf '%s\n' "$(pnpm --version)" > "$EVIDENCE_DIR/pnpm.version"
+          printf '%s\n' "$EXPECTED_PACKAGE_MANAGER" > "$EVIDENCE_DIR/package-manager.txt"
+          printf '%s\n' "$PNPM_STORE_DIR" > "$EVIDENCE_DIR/store.path"
+
+      - name: Frozen install exactly once
+        id: frozen_install
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install.started"
+          set +e
+          pnpm install --frozen-lockfile --store-dir "$PNPM_STORE_DIR" > "$EVIDENCE_DIR/install.stdout.log" 2> "$EVIDENCE_DIR/install.stderr.log"
+          install_exit=$?
+          set -e
+          printf '%s\n' "$install_exit" > "$EVIDENCE_DIR/install.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install.ended"
+          exit "$install_exit"
+
+      - name: Capture pre-run source and resources
+        id: prestate
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/pre.utc"
+          git rev-parse HEAD > "$EVIDENCE_DIR/pre.head"
+          git rev-parse HEAD^{tree} > "$EVIDENCE_DIR/pre.tree"
+          git rev-parse HEAD^ > "$EVIDENCE_DIR/pre.parent"
+          git status --porcelain=v1 --untracked-files=all > "$EVIDENCE_DIR/pre.status"
+          nproc > "$EVIDENCE_DIR/pre.nproc"
+          df -Pk "$GITHUB_WORKSPACE" "$RUNNER_TEMP" > "$EVIDENCE_DIR/pre.df"
+          cp /proc/meminfo "$EVIDENCE_DIR/pre.meminfo"
+          for pressure in cpu memory io; do
+            if test -r "/proc/pressure/$pressure"; then
+              cp "/proc/pressure/$pressure" "$EVIDENCE_DIR/pre.psi.$pressure"
+            else
+              printf '%s\n' "NOT_AVAILABLE" > "$EVIDENCE_DIR/pre.psi.$pressure"
+            fi
+          done
+          test "$(cat "$EVIDENCE_DIR/pre.head")" = "$P2_SHA"
+          test "$(cat "$EVIDENCE_DIR/pre.tree")" = "$P2_TREE"
+          test "$(cat "$EVIDENCE_DIR/pre.parent")" = "$P_SHA"
+          test ! -s "$EVIDENCE_DIR/pre.status"
+
+      - name: Prepare bounded non-interfering sampler
+        id: prepare_sampler
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$EVIDENCE_DIR/sampler.py" <<'PY'
+          import argparse
+          import datetime
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+          import time
+
+          NOT_AVAILABLE = "NOT_AVAILABLE"
+          SAMPLE_INTERVAL_SECONDS = 10.0
+          POLL_INTERVAL_SECONDS = 1.0
+          PRE_SIGNAL_LEAD_SECONDS = 1.0
+          HINT_RE = re.compile(r"\b(?:project|file|test|hook|reporter)\b", re.IGNORECASE)
+          ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+
+
+          def utc_now():
+              return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+          def read_text(path, limit=262144):
+              try:
+                  data = pathlib.Path(path).read_bytes()
+                  if len(data) > limit:
+                      data = data[-limit:]
+                  return data.decode("utf-8", errors="replace")
+              except (OSError, ValueError):
+                  return None
+
+
+          def read_proc_text(pid, name, limit=262144):
+              return read_text(f"/proc/{pid}/{name}", limit=limit)
+
+
+          def parse_status(text):
+              if text is None:
+                  return NOT_AVAILABLE
+              allowed = {
+                  "Name", "State", "PPid", "Threads", "VmPeak", "VmSize", "VmHWM", "VmRSS",
+                  "RssAnon", "RssFile", "RssShmem", "voluntary_ctxt_switches",
+                  "nonvoluntary_ctxt_switches",
+              }
+              result = {}
+              for line in text.splitlines():
+                  key, sep, value = line.partition(":")
+                  if sep and key in allowed:
+                      result[key] = value.strip()
+              return result or NOT_AVAILABLE
+
+
+          def parse_io(text):
+              if text is None:
+                  return NOT_AVAILABLE
+              result = {}
+              for line in text.splitlines():
+                  key, sep, value = line.partition(":")
+                  if sep:
+                      result[key] = value.strip()
+              return result or NOT_AVAILABLE
+
+
+          def parse_stat(text):
+              if text is None:
+                  return NOT_AVAILABLE
+              try:
+                  closing = text.rindex(")")
+                  fields = text[closing + 2 :].split()
+                  clock_ticks = os.sysconf("SC_CLK_TCK")
+                  page_size = os.sysconf("SC_PAGE_SIZE")
+                  uptime_text = read_text("/proc/uptime", limit=65536)
+                  uptime_seconds = float(uptime_text.split()[0]) if uptime_text is not None else None
+                  user_ticks = int(fields[11])
+                  system_ticks = int(fields[12])
+                  threads = int(fields[17])
+                  start_ticks = int(fields[19])
+                  rss_pages = int(fields[21])
+                  elapsed_ms = (
+                      int(max(0.0, uptime_seconds - (start_ticks / clock_ticks)) * 1000)
+                      if uptime_seconds is not None else NOT_AVAILABLE
+                  )
+                  return {
+                      "state": fields[0],
+                      "ppid": int(fields[1]),
+                      "cpuUserTicks": user_ticks,
+                      "cpuSystemTicks": system_ticks,
+                      "cpuTotalTicks": user_ticks + system_ticks,
+                      "threads": threads,
+                      "rssPages": rss_pages,
+                      "rssBytes": rss_pages * page_size,
+                      "elapsedMillis": elapsed_ms,
+                  }
+              except (ValueError, IndexError, OSError):
+                  return NOT_AVAILABLE
+
+
+          def child_pids(pid):
+              text = read_proc_text(pid, f"task/{pid}/children", limit=65536)
+              if text is None:
+                  return []
+              children = []
+              for token in text.split():
+                  if token.isdigit():
+                      children.append(int(token))
+              return children
+
+
+          def process_tree(root_pid):
+              pending = [root_pid]
+              seen = set()
+              ordered = []
+              while pending and len(seen) < 256:
+                  pid = pending.pop(0)
+                  if pid in seen:
+                      continue
+                  seen.add(pid)
+                  ordered.append(pid)
+                  pending.extend(child_pids(pid))
+              return ordered
+
+
+          def process_record(pid):
+              status_text = read_proc_text(pid, "status")
+              stat_text = read_proc_text(pid, "stat", limit=65536)
+              wchan_text = read_proc_text(pid, "wchan", limit=65536)
+              io_text = read_proc_text(pid, "io", limit=65536)
+              status = parse_status(status_text)
+              stat_summary = parse_stat(stat_text)
+              try:
+                  fd_count = len(os.listdir(f"/proc/{pid}/fd"))
+              except OSError:
+                  fd_count = NOT_AVAILABLE
+              stat_fields = stat_text.strip() if stat_text is not None else NOT_AVAILABLE
+              return {
+                  "pid": pid,
+                  "ppid": (stat_summary.get("ppid", NOT_AVAILABLE)
+                           if isinstance(stat_summary, dict) else NOT_AVAILABLE),
+                  "status": status,
+                  "elapsedMillis": (stat_summary.get("elapsedMillis", NOT_AVAILABLE)
+                                    if isinstance(stat_summary, dict) else NOT_AVAILABLE),
+                  "cpu": ({
+                      "userTicks": stat_summary["cpuUserTicks"],
+                      "systemTicks": stat_summary["cpuSystemTicks"],
+                      "totalTicks": stat_summary["cpuTotalTicks"],
+                  } if isinstance(stat_summary, dict) else NOT_AVAILABLE),
+                  "rssBytes": (stat_summary.get("rssBytes", NOT_AVAILABLE)
+                               if isinstance(stat_summary, dict) else NOT_AVAILABLE),
+                  "threads": (stat_summary.get("threads", NOT_AVAILABLE)
+                              if isinstance(stat_summary, dict) else NOT_AVAILABLE),
+                  "stat": stat_fields,
+                  "statSummary": stat_summary,
+                  "wchan": wchan_text.strip() if wchan_text is not None else NOT_AVAILABLE,
+                  "io": parse_io(io_text),
+                  "fdCount": fd_count,
+              }
+
+
+          def pressure_snapshot():
+              result = {}
+              for name in ("cpu", "memory", "io"):
+                  text = read_text(f"/proc/pressure/{name}", limit=65536)
+                  result[name] = text.strip() if text is not None else NOT_AVAILABLE
+              return result
+
+
+          def memory_snapshot():
+              text = read_text("/proc/meminfo", limit=262144)
+              if text is None:
+                  return NOT_AVAILABLE
+              wanted = {"MemTotal", "MemFree", "MemAvailable", "Buffers", "Cached", "SwapTotal", "SwapFree"}
+              result = {}
+              for line in text.splitlines():
+                  key, sep, value = line.partition(":")
+                  if sep and key in wanted:
+                      result[key] = value.strip()
+              return result or NOT_AVAILABLE
+
+
+          def disk_snapshot(path):
+              try:
+                  stats = os.statvfs(path)
+                  return {
+                      "blockSize": stats.f_frsize,
+                      "blocks": stats.f_blocks,
+                      "blocksFree": stats.f_bfree,
+                      "blocksAvailable": stats.f_bavail,
+                      "bytesTotal": stats.f_frsize * stats.f_blocks,
+                      "bytesFree": stats.f_frsize * stats.f_bfree,
+                      "bytesAvailable": stats.f_frsize * stats.f_bavail,
+                  }
+              except OSError:
+                  return NOT_AVAILABLE
+
+
+          def reporter_snapshot(path):
+              reporter = pathlib.Path(path)
+              try:
+                  stat = reporter.stat()
+              except OSError:
+                  return {"exists": False, "size": 0, "validJson": False}
+              valid = False
+              if stat.st_size > 0:
+                  try:
+                      valid = isinstance(json.loads(reporter.read_text(encoding="utf-8")), dict)
+                  except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                      valid = False
+              return {"exists": True, "size": stat.st_size, "validJson": valid}
+
+
+          def last_hint(paths):
+              candidates = []
+              for path in paths:
+                  text = read_text(path, limit=65536)
+                  if text is None:
+                      continue
+                  for line in text.splitlines():
+                      clean = ANSI_RE.sub("", line).strip()
+                      if clean and HINT_RE.search(clean):
+                          candidates.append(clean[:512])
+              if not candidates:
+                  return NOT_AVAILABLE
+              hint = candidates[-1]
+              return {"text": hint, "sha256": hashlib.sha256(hint.encode("utf-8")).hexdigest()}
+
+
+          def marker_line(line):
+              return line.startswith("[vitest] still running with no output for ") or line.startswith(
+                  "[vitest] no output for "
+              ) or line.startswith("[vitest] process group still alive after ")
+
+
+          def read_new_complete_lines(path, offset, carry):
+              try:
+                  with open(path, "rb") as handle:
+                      handle.seek(offset)
+                      data = handle.read()
+                      next_offset = handle.tell()
+              except OSError:
+                  return offset, carry, [], False
+              changed = bool(data)
+              payload = carry + data
+              parts = payload.split(b"\n")
+              next_carry = parts.pop()
+              lines = [part.decode("utf-8", errors="replace") for part in parts]
+              return next_offset, next_carry, lines, changed
+
+
+          def process_exists(pid):
+              try:
+                  os.kill(pid, 0)
+                  return True
+              except ProcessLookupError:
+                  return False
+              except PermissionError:
+                  return True
+
+
+          def sample(args, reason, sequence, started_monotonic):
+              pids = process_tree(args.pid) if process_exists(args.pid) else []
+              return {
+                  "schema": "r7-watchdog-diagnostic-sample-v1",
+                  "sequence": sequence,
+                  "reason": reason,
+                  "utc": utc_now(),
+                  "elapsedMillis": int((time.monotonic() - started_monotonic) * 1000),
+                  "rootPid": args.pid,
+                  "processes": [process_record(pid) for pid in pids] if pids else NOT_AVAILABLE,
+                  "system": {
+                      "cpuCount": os.cpu_count() if os.cpu_count() is not None else NOT_AVAILABLE,
+                      "memory": memory_snapshot(),
+                      "pressure": pressure_snapshot(),
+                      "workspaceDisk": disk_snapshot(args.workspace),
+                      "evidenceDisk": disk_snapshot(args.evidence),
+                  },
+                  "lastEmittedHint": last_hint([args.stdout, args.stderr]),
+                  "reporter": reporter_snapshot(args.reporter),
+              }
+
+
+          def main():
+              parser = argparse.ArgumentParser()
+              parser.add_argument("--pid", type=int, required=True)
+              parser.add_argument("--silence-cap-ms", type=int, required=True)
+              parser.add_argument("--heartbeat-ms", type=int, required=True)
+              parser.add_argument("--stdout", required=True)
+              parser.add_argument("--stderr", required=True)
+              parser.add_argument("--reporter", required=True)
+              parser.add_argument("--workspace", required=True)
+              parser.add_argument("--evidence", required=True)
+              parser.add_argument("--output", required=True)
+              args = parser.parse_args()
+              if args.pid <= 0 or args.silence_cap_ms not in (120000, 300000) or args.heartbeat_ms != 30000:
+                  raise SystemExit(2)
+              started = time.monotonic()
+              last_child_activity = started
+              next_periodic = started
+              pre_signal_taken_for_activity = None
+              offsets = {args.stdout: 0, args.stderr: 0}
+              carries = {args.stdout: b"", args.stderr: b""}
+              terminal_observed = False
+              sequence = 0
+              output = pathlib.Path(args.output)
+              with output.open("w", encoding="utf-8") as stream:
+                  while True:
+                      now = time.monotonic()
+                      for path in (args.stdout, args.stderr):
+                          offsets[path], carries[path], lines, changed = read_new_complete_lines(
+                              path, offsets[path], carries[path]
+                          )
+                          child_activity = False
+                          for line in lines:
+                              if line.startswith("[vitest] no output for "):
+                                  terminal_observed = True
+                              if not marker_line(line):
+                                  child_activity = True
+                          if changed and child_activity:
+                              last_child_activity = now
+                              pre_signal_taken_for_activity = None
+                      reason = None
+                      silence_seconds = now - last_child_activity
+                      pre_signal_at = (args.silence_cap_ms / 1000.0) - PRE_SIGNAL_LEAD_SECONDS
+                      if pre_signal_at > 0 and silence_seconds >= pre_signal_at and pre_signal_taken_for_activity != last_child_activity:
+                          reason = "pre_sigterm"
+                          pre_signal_taken_for_activity = last_child_activity
+                      elif terminal_observed:
+                          reason = "terminal_observed"
+                          terminal_observed = False
+                      elif now >= next_periodic:
+                          reason = "periodic"
+                      if reason is not None:
+                          sequence += 1
+                          stream.write(json.dumps(sample(args, reason, sequence, started), sort_keys=True) + "\n")
+                          stream.flush()
+                          if reason == "periodic":
+                              next_periodic = now + SAMPLE_INTERVAL_SECONDS
+                      if not process_exists(args.pid):
+                          sequence += 1
+                          stream.write(json.dumps(sample(args, "final", sequence, started), sort_keys=True) + "\n")
+                          stream.flush()
+                          break
+                      time.sleep(POLL_INTERVAL_SECONDS)
+
+
+          if __name__ == "__main__":
+              main()
+          PY
+          python3 - "$EVIDENCE_DIR/sampler.py" <<'PY'
+          import pathlib
+          import sys
+
+          source = pathlib.Path(sys.argv[1]).read_text(encoding="utf-8")
+          compile(source, sys.argv[1], "exec")
+          PY
+
+      - name: Run exactly one diagnostic Vitest process with bounded sampler
+        id: diagnostic_run
+        timeout-minutes: ${{ matrix.step_timeout_minutes }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_command="GITHUB_WORKSPACE=$GITHUB_WORKSPACE node scripts/run-vitest.mjs run --config $BOUND_CONFIG --reporter=verbose --reporter=json --outputFile.json=$BOUND_JSON"
+          printf '%s\n' "$expected_command" > "$EVIDENCE_DIR/command.txt"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/test.started"
+          set +e
+          GITHUB_WORKSPACE="$GITHUB_WORKSPACE" node scripts/run-vitest.mjs run \
+            --config "$BOUND_CONFIG" \
+            --reporter=verbose \
+            --reporter=json \
+            --outputFile.json="$BOUND_JSON" \
+            > "$STDOUT_LOG" 2> "$STDERR_LOG" &
+          test_pid=$!
+          printf '%s\n' "$test_pid" > "$EVIDENCE_DIR/test.pid"
+          python3 "$EVIDENCE_DIR/sampler.py" \
+            --pid "$test_pid" \
+            --silence-cap-ms "$WATCHDOG_SILENCE_CAP_MS" \
+            --heartbeat-ms "$WATCHDOG_HEARTBEAT_MS" \
+            --stdout "$STDOUT_LOG" \
+            --stderr "$STDERR_LOG" \
+            --reporter "$BOUND_JSON" \
+            --workspace "$GITHUB_WORKSPACE" \
+            --evidence "$EVIDENCE_DIR" \
+            --output "$EVIDENCE_DIR/samples.jsonl" \
+            > "$EVIDENCE_DIR/sampler.stdout.log" 2> "$EVIDENCE_DIR/sampler.stderr.log" &
+          sampler_pid=$!
+          printf '%s\n' "$sampler_pid" > "$EVIDENCE_DIR/sampler.pid"
+          wait "$test_pid"
+          test_exit=$?
+          wait "$sampler_pid"
+          sampler_exit=$?
+          set -e
+          printf '%s\n' "$test_exit" > "$EVIDENCE_DIR/test.exit"
+          printf '%s\n' "$sampler_exit" > "$EVIDENCE_DIR/sampler.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/test.ended"
+          if test "$sampler_exit" -ne 0; then
+            exit 90
+          fi
+          exit "$test_exit"
+
+      - name: Capture final resources and detached P2 poststate
+        id: poststate
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/post.utc"
+          git rev-parse HEAD > "$EVIDENCE_DIR/post.head" 2> "$EVIDENCE_DIR/post.head.error"
+          head_exit=$?
+          git rev-parse HEAD^{tree} > "$EVIDENCE_DIR/post.tree" 2> "$EVIDENCE_DIR/post.tree.error"
+          tree_exit=$?
+          git rev-parse HEAD^ > "$EVIDENCE_DIR/post.parent" 2> "$EVIDENCE_DIR/post.parent.error"
+          parent_exit=$?
+          git status --porcelain=v1 --untracked-files=all > "$EVIDENCE_DIR/post.status" 2> "$EVIDENCE_DIR/post.status.error"
+          status_exit=$?
+          nproc > "$EVIDENCE_DIR/post.nproc" 2> "$EVIDENCE_DIR/post.nproc.error"
+          df -Pk "$GITHUB_WORKSPACE" "$RUNNER_TEMP" > "$EVIDENCE_DIR/post.df" 2> "$EVIDENCE_DIR/post.df.error"
+          if test -r /proc/meminfo; then
+            cp /proc/meminfo "$EVIDENCE_DIR/post.meminfo"
+          else
+            printf '%s\n' "NOT_AVAILABLE" > "$EVIDENCE_DIR/post.meminfo"
+          fi
+          for pressure in cpu memory io; do
+            if test -r "/proc/pressure/$pressure"; then
+              cp "/proc/pressure/$pressure" "$EVIDENCE_DIR/post.psi.$pressure"
+            else
+              printf '%s\n' "NOT_AVAILABLE" > "$EVIDENCE_DIR/post.psi.$pressure"
+            fi
+          done
+          post_exit=0
+          test "$head_exit" -eq 0 || post_exit=1
+          test "$tree_exit" -eq 0 || post_exit=1
+          test "$parent_exit" -eq 0 || post_exit=1
+          test "$status_exit" -eq 0 || post_exit=1
+          test "$(cat "$EVIDENCE_DIR/post.head" 2>/dev/null)" = "$P2_SHA" || post_exit=1
+          test "$(cat "$EVIDENCE_DIR/post.tree" 2>/dev/null)" = "$P2_TREE" || post_exit=1
+          test "$(cat "$EVIDENCE_DIR/post.parent" 2>/dev/null)" = "$P_SHA" || post_exit=1
+          test ! -s "$EVIDENCE_DIR/post.status" || post_exit=1
+          printf '%s\n' "$post_exit" > "$EVIDENCE_DIR/poststate.exit"
+          exit "$post_exit"
+
+      - name: Finalize diagnostic-only disposition
+        id: finalize
+        if: always()
+        env:
+          HARNESS_CHECKOUT_OUTCOME: ${{ steps.harness_checkout.outcome }}
+          HARNESS_GUARD_OUTCOME: ${{ steps.harness_guard.outcome }}
+          SOURCE_CHECKOUT_OUTCOME: ${{ steps.source_checkout.outcome }}
+          GUARD_OUTCOME: ${{ steps.source_guard.outcome }}
+          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
+          BIND_PNPM_OUTCOME: ${{ steps.bind_pnpm.outcome }}
+          INSTALL_OUTCOME: ${{ steps.frozen_install.outcome }}
+          PRESTATE_OUTCOME: ${{ steps.prestate.outcome }}
+          PREPARE_SAMPLER_OUTCOME: ${{ steps.prepare_sampler.outcome }}
+          RUN_OUTCOME: ${{ steps.diagnostic_run.outcome }}
+          POSTSTATE_OUTCOME: ${{ steps.poststate.outcome }}
+          RUNNER_ENVIRONMENT_FINAL: ${{ runner.environment }}
+        shell: bash
+        run: |
+          set +e
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/final.started"
+          python3 - <<'PY' > "$EVIDENCE_DIR/finalizer.log" 2>&1
+          import datetime
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+          import sys
+
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          errors = []
+          UTC_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\n$")
+
+
+          def read(name):
+              path = evidence / name
+              try:
+                  return path.read_text(encoding="utf-8")
+              except (OSError, UnicodeDecodeError):
+                  errors.append(f"missing or unreadable {name}")
+                  return None
+
+
+          def read_int(name):
+              text = read(name)
+              if text is None:
+                  return None
+              value = text.strip()
+              if not re.fullmatch(r"[0-9]+", value):
+                  errors.append(f"invalid integer {name}")
+                  return None
+              return int(value)
+
+
+          def valid_utc(name):
+              text = read(name)
+              if text is None:
+                  return None
+              if len(text.encode("ascii", errors="ignore")) != 21 or not UTC_RE.fullmatch(text):
+                  errors.append(f"invalid strict UTC marker {name}")
+                  return None
+              try:
+                  return datetime.datetime.strptime(text.strip(), "%Y-%m-%dT%H:%M:%SZ").replace(
+                      tzinfo=datetime.timezone.utc
+                  )
+              except ValueError:
+                  errors.append(f"invalid UTC calendar value {name}")
+                  return None
+
+
+          def load_report():
+              path = evidence / "reporter.json"
+              try:
+                  value = json.loads(path.read_text(encoding="utf-8"))
+              except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                  return None
+              return value if isinstance(value, dict) else None
+
+
+          def nonnegative_int(value):
+              return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+          def validate_watchdog_markers(stderr, label, cap, heartbeat, test_exit):
+              heartbeat_prefix = "[vitest] still running with no output for "
+              terminal_prefix = "[vitest] no output for "
+              force_prefix = "[vitest] process group still alive after "
+              expected_heartbeats = [
+                  f"{heartbeat_prefix}{elapsed}ms ({label})."
+                  for elapsed in range(heartbeat, cap, heartbeat)
+              ]
+              terminal = f"{terminal_prefix}{cap}ms; terminating stalled Vitest process group ({label})."
+              force = f"{force_prefix}5000ms; sending SIGKILL ({label})."
+              marker_events = []
+              terminal_count = 0
+              force_count = 0
+              marker_prefixes = (heartbeat_prefix, terminal_prefix, force_prefix)
+              for line_number, line in enumerate(stderr.splitlines(), start=1):
+                  if line in expected_heartbeats:
+                      marker_events.append(line)
+                  elif line == terminal:
+                      marker_events.append(line)
+                      terminal_count += 1
+                  elif line == force:
+                      marker_events.append(line)
+                      force_count += 1
+                      if len(marker_events) < 2 or marker_events[-2] != terminal:
+                          errors.append("force-kill marker is not exactly after the terminal marker")
+                  elif line.startswith(marker_prefixes):
+                      marker_events.append(line)
+                      errors.append(f"unbound or malformed watchdog marker at stderr line {line_number}")
+              if terminal_count > 1 or force_count > 1:
+                  errors.append("duplicate watchdog terminal or force marker")
+              expected_suffix = expected_heartbeats + [terminal]
+              if test_exit == 137 and terminal_count == 1:
+                  expected_suffix += [force]
+              if terminal_count == 1 and marker_events[-len(expected_suffix):] != expected_suffix:
+                  errors.append("final watchdog marker suffix is incomplete or out of order")
+              if terminal_count and test_exit not in (137, 143):
+                  errors.append("watchdog terminal marker conflicts with process exit signal")
+              if test_exit == 143 and force_count != 0:
+                  errors.append("SIGTERM exit conflicts with force-kill marker")
+              if test_exit == 137 and terminal_count == 1 and force_count != 1:
+                  errors.append("SIGKILL exit lacks exactly one post-terminal force-kill marker")
+              if force_count and test_exit != 137:
+                  errors.append("force-kill marker conflicts with non-SIGKILL exit")
+              if force_count and terminal_count != 1:
+                  errors.append("force-kill marker exists without exactly one terminal marker")
+              signal_number = 15 if test_exit == 143 else 9 if test_exit == 137 else None
+              return {
+                  "terminal": terminal,
+                  "force": force,
+                  "terminalCount": terminal_count,
+                  "forceCount": force_count,
+                  "heartbeatCount": sum(1 for item in marker_events if item in expected_heartbeats),
+                  "expectedHeartbeatCount": len(expected_heartbeats),
+                  "markerEventCount": len(marker_events),
+                  "finalSuffixValid": terminal_count == 1 and marker_events[-len(expected_suffix):] == expected_suffix,
+                  "signalNumber": signal_number,
+              }
+
+
+          def validate_samples():
+              path = evidence / "samples.jsonl"
+              try:
+                  lines = path.read_text(encoding="utf-8").splitlines()
+              except (OSError, UnicodeDecodeError):
+                  errors.append("missing samples.jsonl")
+                  return {"count": 0, "preSigtermSamples": 0, "finalSamples": 0}
+              if not lines:
+                  errors.append("empty samples.jsonl")
+                  return {"count": 0, "preSigtermSamples": 0, "finalSamples": 0}
+              records = []
+              for index, line in enumerate(lines, start=1):
+                  try:
+                      value = json.loads(line)
+                  except json.JSONDecodeError:
+                      errors.append(f"invalid sample JSON line {index}")
+                      continue
+                  if not isinstance(value, dict) or value.get("schema") != "r7-watchdog-diagnostic-sample-v1":
+                      errors.append(f"invalid sample shape line {index}")
+                      continue
+                  if value.get("sequence") != index:
+                      errors.append(f"non-contiguous sample sequence line {index}")
+                  records.append(value)
+              reasons = [item.get("reason") for item in records]
+              if "final" not in reasons:
+                  errors.append("sampler lacks final sample")
+              return {
+                  "count": len(records),
+                  "preSigtermSamples": reasons.count("pre_sigterm"),
+                  "terminalObservedSamples": reasons.count("terminal_observed"),
+                  "finalSamples": reasons.count("final"),
+              }
+
+
+          config = os.environ["BOUND_CONFIG"]
+          bound_json = os.environ["BOUND_JSON"]
+          cap = int(os.environ["WATCHDOG_SILENCE_CAP_MS"])
+          heartbeat = int(os.environ["WATCHDOG_HEARTBEAT_MS"])
+          test_exit = read_int("test.exit")
+          sampler_exit = read_int("sampler.exit")
+          poststate_exit = read_int("poststate.exit")
+          for marker in ("job.started", "harness-guard.started", "harness-guard.ended", "guard.started", "guard.ended", "install.started", "install.ended", "pre.utc", "test.started", "test.ended", "post.utc", "final.started"):
+              valid_utc(marker)
+          started = valid_utc("test.started")
+          ended = valid_utc("test.ended")
+          if started is not None and ended is not None and ended < started:
+              errors.append("test UTC interval is reversed")
+          if cap not in (120000, 300000) or heartbeat != 30000:
+              errors.append("watchdog thresholds differ from bound repository-native values")
+          expected_by_id = {
+              "core-tooling": ("test/vitest/vitest.full-core-tooling.config.ts", 120000, 45, 90),
+              "agentic": ("test/vitest/vitest.full-agentic.config.ts", 300000, 120, 165),
+          }
+          expected = expected_by_id.get(os.environ["DIAGNOSTIC_ID"])
+          if expected != (config, cap, int(os.environ["STEP_TIMEOUT_MINUTES"]), int(os.environ["JOB_TIMEOUT_MINUTES"])):
+              errors.append("matrix config, silence cap, or step/job cap mismatch")
+          expected_command = (
+              f"GITHUB_WORKSPACE={os.environ['GITHUB_WORKSPACE']} node scripts/run-vitest.mjs run "
+              f"--config {config} --reporter=verbose --reporter=json --outputFile.json={bound_json}\n"
+          )
+          if read("command.txt") != expected_command:
+              errors.append("command evidence differs from exact bound invocation")
+          stderr = read("test.stderr.log") or ""
+          label = (
+              f"run --config {config} --reporter=verbose --reporter=json "
+              f"--outputFile.json={bound_json}"
+          )
+          marker_validation = validate_watchdog_markers(stderr, label, cap, heartbeat, test_exit)
+          terminal_count = marker_validation["terminalCount"]
+          force_count = marker_validation["forceCount"]
+          samples = validate_samples()
+          report = load_report()
+          report_success = report.get("success") if report is not None else None
+          failed_tests = report.get("numFailedTests") if report is not None else None
+          failed_suites = report.get("numFailedTestSuites") if report is not None else None
+          total_tests = report.get("numTotalTests") if report is not None else None
+          total_suites = report.get("numTotalTestSuites") if report is not None else None
+          report_counts_valid = all(
+              nonnegative_int(value) for value in (failed_tests, failed_suites, total_tests, total_suites)
+          ) if report is not None else False
+          if sampler_exit != 0:
+              errors.append("sampler did not complete successfully")
+          if poststate_exit != 0:
+              errors.append("P2 poststate failed")
+          required_outcomes = {
+              "harnessCheckout": os.environ["HARNESS_CHECKOUT_OUTCOME"],
+              "harnessGuard": os.environ["HARNESS_GUARD_OUTCOME"],
+              "sourceCheckout": os.environ["SOURCE_CHECKOUT_OUTCOME"],
+              "sourceGuard": os.environ["GUARD_OUTCOME"],
+              "setupNode": os.environ["SETUP_NODE_OUTCOME"],
+              "bindPnpm": os.environ["BIND_PNPM_OUTCOME"],
+              "frozenInstall": os.environ["INSTALL_OUTCOME"],
+              "prestate": os.environ["PRESTATE_OUTCOME"],
+              "prepareSampler": os.environ["PREPARE_SAMPLER_OUTCOME"],
+              "diagnosticRun": os.environ["RUN_OUTCOME"],
+              "poststate": os.environ["POSTSTATE_OUTCOME"],
+          }
+          for name in ("harnessCheckout", "harnessGuard", "sourceCheckout", "sourceGuard", "setupNode", "bindPnpm", "frozenInstall", "prestate", "prepareSampler", "poststate"):
+              if required_outcomes[name] != "success":
+                  errors.append(f"required step {name} was not successful")
+          runner = {
+              "environment": (read("runner.environment") or "").strip(),
+              "os": (read("runner.os") or "").strip(),
+              "arch": (read("runner.arch") or "").strip(),
+              "imageOS": (read("runner.image-os") or "").strip(),
+              "imageVersion": (read("runner.image-version") or "").strip(),
+          }
+          if runner["environment"] != "github-hosted" or os.environ["RUNNER_ENVIRONMENT_FINAL"] != "github-hosted":
+              errors.append("runner.environment is not exactly github-hosted")
+          if runner["os"] != "Linux" or runner["arch"] != "X64":
+              errors.append("runner OS or architecture differs from Linux/X64")
+          if not runner["imageOS"] or not runner["imageVersion"]:
+              errors.append("runner ImageOS or ImageVersion is absent")
+          if runner["imageOS"] != os.environ.get("ImageOS") or runner["imageVersion"] != os.environ.get("ImageVersion"):
+              errors.append("runner image identity changed after initialization")
+          harness = {
+              "head": (read("harness.head") or "").strip(),
+              "parent": (read("harness.parent") or "").strip(),
+              "message": (read("harness.message") or "").strip(),
+              "numstat": (read("harness.numstat") or "").strip(),
+              "workflowPath": os.environ["WORKFLOW_PATH"],
+          }
+          expected_numstat = f"{os.environ['EXPECTED_H_ADDITIONS']}\t0\t{os.environ['WORKFLOW_PATH']}"
+          if harness["head"] != os.environ["GITHUB_SHA"]:
+              errors.append("sealed harness head differs from event SHA")
+          if harness["parent"] != os.environ["EXPECTED_H_PARENT"]:
+              errors.append("sealed harness parent differs from exact P2")
+          if harness["message"] != os.environ["EXPECTED_H_MESSAGE"]:
+              errors.append("sealed harness message differs from exact contract")
+          if harness["numstat"] != expected_numstat:
+              errors.append("sealed harness numstat differs from exact workflow-only scope")
+          classification = "HARNESS_ERROR"
+          origin = "HARNESS"
+          completion = "INCOMPLETE"
+          test_disposition = "UNKNOWN"
+          signal = "NONE"
+          if not errors:
+              if terminal_count == 1 and test_exit in (143, 137):
+                  valid_watchdog_pair = (test_exit == 143 and force_count == 0) or (test_exit == 137 and force_count == 1)
+                  if not valid_watchdog_pair:
+                      errors.append("watchdog exit and force-marker provenance conflict")
+                  else:
+                      classification = "UNKNOWN_INCOMPLETE"
+                      origin = "REPO_NATIVE_NO_OUTPUT_WATCHDOG"
+                      completion = "INCOMPLETE"
+                      test_disposition = "UNKNOWN"
+                      signal = "SIGTERM" if test_exit == 143 else "SIGKILL"
+                      if samples["preSigtermSamples"] < 1:
+                          errors.append("watchdog lacks final pre-SIGTERM diagnostic sample")
+              elif terminal_count == 0 and force_count == 0 and test_exit == 0:
+                  if report is None or report_success is not True or not report_counts_valid:
+                      errors.append("successful process lacks a coherent successful reporter")
+                  elif failed_tests != 0 or failed_suites != 0 or total_tests <= 0 or total_suites <= 0:
+                      errors.append("successful reporter counts are incoherent")
+                  else:
+                      classification = "COMPLETE"
+                      origin = "VITEST"
+                      completion = "COMPLETE"
+                      test_disposition = "PASS"
+              elif terminal_count == 0 and force_count == 0 and test_exit == 1:
+                  if report is None or report_success is not False or not report_counts_valid:
+                      errors.append("exit 1 lacks a coherent failed reporter")
+                  elif failed_tests <= 0 or failed_suites <= 0:
+                      errors.append("exit 1 reporter lacks failed tests and suites")
+                  else:
+                      classification = "TEST_FAILURE"
+                      origin = "VITEST"
+                      completion = "COMPLETE"
+                      test_disposition = "FAIL"
+              elif terminal_count == 0 and force_count == 0 and test_exit in (137, 143):
+                  classification = "UNKNOWN_INCOMPLETE"
+                  origin = "UNKNOWN"
+                  completion = "INCOMPLETE"
+                  test_disposition = "UNKNOWN"
+                  signal = "SIGTERM" if test_exit == 143 else "SIGKILL"
+              else:
+                  errors.append("process exit cannot be classified by the diagnostic contract")
+          if errors:
+              classification = "HARNESS_ERROR"
+              origin = "HARNESS"
+              completion = "INCOMPLETE"
+              test_disposition = "UNKNOWN"
+          history = {
+              "harness": "H14",
+              "commit": "9319cdfc7e16b6f8bb72cad9cdf19cbb9db3ea1b",
+              "run": 31336661822,
+              "manifestSha256": "77f69b613b7505265891dc7d4142c38cf8534a04fa9bcec128f9f5647e04b12e",
+              "finalSeal": "b4015f317feb3e19afab7561a52173d36994dd24a6cd5d0dc327e0d4e7e4ee21",
+              "aggregateSeal": "2e8bd2ec5051fd981ddb4139c4c10670a54fcfe5b9849f0fa8c4a1695d114163",
+              "artifacts": [
+                  {"id": 9044598233, "name": "r7-h14-shard-01-core-unit-fast-P2-31336661822-attempt-1", "digest": "15e3d1e8b45c3f83628a9722566e78f370623b5d0ec77e334d621dcd33d0cbf6"},
+                  {"id": 9044620206, "name": "r7-h14-shard-02-core-unit-src-P2-31336661822-attempt-1", "digest": "0c305966730cb458c6126afa280d81cf2adeddf81bc397a03399c72f1f72e07e"},
+                  {"id": 9044555673, "name": "r7-h14-shard-03-core-unit-security-P2-31336661822-attempt-1", "digest": "ed2a9c6132dd6907defbc84ced483c3e541a6bdb8ea297e1cbd0b32ea7341df3"},
+                  {"id": 9044573700, "name": "r7-h14-shard-04-core-unit-support-P2-31336661822-attempt-1", "digest": "0f2326ee18a7f56269351985e5b55ba9ed88d5d3cd937e5c631b260796f8cc85"},
+                  {"id": 9044587860, "name": "r7-h14-shard-05-core-support-boundary-P2-31336661822-attempt-1", "digest": "294f2f605dd435a234beb955efc2242ff9ffa3c449046d5c5bad6920a1c72d02"},
+                  {"id": 9044736084, "name": "r7-h14-shard-06-core-tooling-P2-31336661822-attempt-1", "digest": "38d0c8879ee655c73bc424eb4aad992e928ae7d28db69d07e0215acdfb471ec8"},
+                  {"id": 9044643918, "name": "r7-h14-shard-07-core-contracts-P2-31336661822-attempt-1", "digest": "c60a84e07a0c4b6a8ac95eee7ee875a72d9823b03d936deea412c78636feeb4b"},
+                  {"id": 9044636583, "name": "r7-h14-shard-08-core-bundled-P2-31336661822-attempt-1", "digest": "dd3846044d678fab8ec11d45c8034ebb37331d2956236ad124be3e1356d9c4ea"},
+                  {"id": 9044987525, "name": "r7-h14-shard-09-core-runtime-P2-31336661822-attempt-1", "digest": "b7e582ddcd84e74470296417c5fe6252c32683061c6310e04117c4487cf0bfd7"},
+                  {"id": 9045342566, "name": "r7-h14-shard-10-agentic-P2-31336661822-attempt-1", "digest": "b916f4a88744130334f3eb7c958d85ba8cc687f9988f9f2cf21fc1ab8ba5d6f7"},
+                  {"id": 9044823844, "name": "r7-h14-shard-11-auto-reply-P2-31336661822-attempt-1", "digest": "435f31c552eef61c594376f2dd0666ad77387b1bae2bbca664002c2c36c1b7b2"},
+                  {"id": 9045410892, "name": "r7-h14-shard-12-extensions-P2-31336661822-attempt-1", "digest": "50e1bd11976afeeedf8da0297de7bef5cbac85de229572f08824535cbeec75e8"},
+                  {"id": 9045414021, "name": "r7-h14-aggregate-P2-31336661822-attempt-1", "digest": "41d2a9019a40da69e01ef0bc95876f5d7146568b58e01f19dda8508b71ec7a85"},
+                  {"id": 9045416582, "name": "r7-h14-final-P2-31336661822-attempt-1", "digest": "ce98d80303c26a0812c1de5722e03c40d63c803a87984f79611b1601b72201f1"},
+              ],
+          }
+          manifest = {
+              "schema": "r7-watchdog-diagnostic-d2-v1",
+              "disposition": "DIAGNOSTIC_ONLY",
+              "heavyGreen": False,
+              "failureCannotBecomeGreen": True,
+              "diagnostic": {
+                  "index": os.environ["DIAGNOSTIC_INDEX"],
+                  "id": os.environ["DIAGNOSTIC_ID"],
+                  "config": config,
+                  "configBlob": os.environ["BOUND_CONFIG_BLOB_SHA"],
+                  "silenceCapMs": cap,
+                  "heartbeatMs": heartbeat,
+                  "stepTimeoutMinutes": int(os.environ["STEP_TIMEOUT_MINUTES"]),
+                  "jobTimeoutMinutes": int(os.environ["JOB_TIMEOUT_MINUTES"]),
+                  "processInvocations": 1,
+                  "retryCount": 0,
+              },
+              "source": {"head": os.environ["P2_SHA"], "tree": os.environ["P2_TREE"], "parent": os.environ["P_SHA"]},
+              "harness": harness,
+              "runner": runner,
+              "result": {
+                  "classification": classification,
+                  "origin": origin,
+                  "completion": completion,
+                  "testDisposition": test_disposition,
+                  "exit": test_exit,
+                  "signal": signal,
+                  "terminalMarkerObserved": terminal_count == 1,
+                  "forceKillMarkerObserved": force_count == 1,
+                  "watchdogMarkerSequence": marker_validation,
+              },
+              "reporter": {
+                  "existsAndValid": report is not None,
+                  "success": report_success,
+                  "numTotalTests": total_tests,
+                  "numFailedTests": failed_tests,
+                  "numTotalTestSuites": total_suites,
+                  "numFailedTestSuites": failed_suites,
+              },
+              "sampler": samples,
+              "steps": required_outcomes,
+              "errors": errors,
+              "immutableHistory": history,
+          }
+          finalstatus = {
+              "schema": "r7-watchdog-diagnostic-finalstatus-v1",
+              "status": "COMPLETE" if classification == "COMPLETE" else "FAIL",
+              "classification": classification,
+              "disposition": "DIAGNOSTIC_ONLY",
+              "heavyGreen": False,
+              "failureCannotBecomeGreen": True,
+              "errors": errors,
+          }
+          (evidence / "diagnostic-manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          (evidence / "finalstatus.json").write_text(json.dumps(finalstatus, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          finalizer_exit = 0 if classification == "COMPLETE" else 1
+          (evidence / "final.exit").write_text(f"{finalizer_exit}\n", encoding="utf-8")
+          (evidence / "final.ended").write_text(
+              datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ\n"),
+              encoding="ascii",
+          )
+          print(json.dumps(finalstatus, sort_keys=True))
+          sys.exit(finalizer_exit)
+          PY
+          finalizer_exit=$?
+          exit "$finalizer_exit"
+
+      - name: Seal exact diagnostic evidence set
+        id: seal
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+
+          root = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          excluded = {"seal.files", "seal.json", "seal.sha256"}
+          files = sorted(path for path in root.rglob("*") if path.is_file() and path.name not in excluded)
+          for path in root.rglob("*"):
+              if path.is_symlink():
+                  raise SystemExit(f"symlink forbidden in evidence: {path}")
+              if path.is_dir() or path.is_file():
+                  continue
+              raise SystemExit(f"non-regular evidence entry: {path}")
+          entries = []
+          for path in files:
+              relative = path.relative_to(root).as_posix()
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              entries.append({"path": relative, "sha256": digest, "bytes": path.stat().st_size})
+          seal_files = root / "seal.files"
+          seal_files.write_text("".join(f"{entry['sha256']}  {entry['path']}\n" for entry in entries), encoding="utf-8")
+          artifact_files = sorted([entry["path"] for entry in entries] + ["seal.files", "seal.json", "seal.sha256"])
+          seal = {
+              "schema": "r7-watchdog-diagnostic-seal-v1",
+              "disposition": "DIAGNOSTIC_ONLY",
+              "selfReferenceFree": True,
+              "sealedFiles": entries,
+              "sealFilesSha256": hashlib.sha256(seal_files.read_bytes()).hexdigest(),
+              "artifactFiles": artifact_files,
+          }
+          seal_json = root / "seal.json"
+          seal_json.write_text(json.dumps(seal, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          seal_sha = root / "seal.sha256"
+          seal_sha.write_text(
+              f"{hashlib.sha256(seal_files.read_bytes()).hexdigest()}  seal.files\n"
+              f"{hashlib.sha256(seal_json.read_bytes()).hexdigest()}  seal.json\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Verify seal and exact upload file set
+        id: verify_seal
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import datetime
+          import json
+          import os
+          import pathlib
+          import re
+
+          root = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          seal = json.loads((root / "seal.json").read_text(encoding="utf-8"))
+          if seal.get("disposition") != "DIAGNOSTIC_ONLY" or seal.get("selfReferenceFree") is not True:
+              raise SystemExit("seal disposition or self-reference contract mismatch")
+          utc_re = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\n$")
+          utc_values = {}
+          for name in ("job.started", "final.started", "final.ended"):
+              text = (root / name).read_text(encoding="ascii")
+              if len(text) != 21 or not utc_re.fullmatch(text):
+                  raise SystemExit(f"invalid strict UTC marker in sealed envelope: {name}")
+              utc_values[name] = datetime.datetime.strptime(text.strip(), "%Y-%m-%dT%H:%M:%SZ")
+          if utc_values["final.started"] < utc_values["job.started"] or utc_values["final.ended"] < utc_values["final.started"]:
+              raise SystemExit("sealed final UTC interval is reversed")
+          if (root / "final.exit").read_text(encoding="ascii") not in ("0\n", "1\n"):
+              raise SystemExit("sealed final.exit is invalid")
+          required = {
+              "command.txt", "diagnostic-manifest.json", "disposition.txt", "final.ended", "final.exit",
+              "final.started", "finalizer.log", "finalstatus.json", "harness-guard.ended",
+              "harness-guard.started", "harness.head", "harness.message", "harness.numstat",
+              "harness.parent", "job.started", "runner.arch", "runner.environment", "runner.image-os",
+              "runner.image-version", "runner.os", "sampler.py",
+              "sampler.stderr.log", "sampler.stdout.log", "test.stderr.log", "test.stdout.log",
+          }
+          actual = sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
+          if actual != seal["artifactFiles"]:
+              raise SystemExit("artifact file set differs from sealed exact set")
+          if not required.issubset(actual):
+              raise SystemExit("sealed envelope lacks required diagnostic files")
+          if any(path.is_symlink() for path in root.rglob("*")):
+              raise SystemExit("symlink present in upload set")
+          expected_lines = []
+          for entry in seal["sealedFiles"]:
+              path = root / entry["path"]
+              if not path.is_file() or path.is_symlink():
+                  raise SystemExit(f"sealed file unavailable: {entry['path']}")
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              if digest != entry["sha256"] or path.stat().st_size != entry["bytes"]:
+                  raise SystemExit(f"sealed file mismatch: {entry['path']}")
+              expected_lines.append(f"{digest}  {entry['path']}\n")
+          if (root / "seal.files").read_text(encoding="utf-8") != "".join(expected_lines):
+              raise SystemExit("seal.files mismatch")
+          if hashlib.sha256((root / "seal.files").read_bytes()).hexdigest() != seal["sealFilesSha256"]:
+              raise SystemExit("seal.files digest mismatch")
+          expected_seal_sha = (
+              f"{hashlib.sha256((root / 'seal.files').read_bytes()).hexdigest()}  seal.files\n"
+              f"{hashlib.sha256((root / 'seal.json').read_bytes()).hexdigest()}  seal.json\n"
+          )
+          if (root / "seal.sha256").read_text(encoding="utf-8") != expected_seal_sha:
+              raise SystemExit("seal container digest mismatch")
+          PY
+
+      - name: Upload exact diagnostic-only evidence envelope
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: r7-watchdog-d2-${{ matrix.index }}-${{ matrix.id }}-P2-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/r7-watchdog-d2-${{ matrix.index }}-${{ matrix.id }}-evidence
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+          include-hidden-files: true
