@@ -1773,22 +1773,27 @@ describe("Claude session catalog", () => {
     await fs.utimes(futureTranscriptPath, new Date(baseNow + 10_000), new Date(baseNow + 10_000));
     await fs.utimes(projectDir, fixedDirectoryTime, fixedDirectoryTime);
     const initial = await listLocalClaudeSessionPage({}, home);
-    const initialUpdatedAt = initial.sessions.find(
-      (session) => session.threadId === sessionId,
-    )?.updatedAt;
+    const initialSession = initial.sessions.find((session) => session.threadId === sessionId);
+    if (!initialSession) {
+      throw new Error("expected initial session");
+    }
+    const initialUpdatedAt = initialSession.updatedAt;
 
     await fs.appendFile(transcriptPath, `${JSON.stringify({ type: "progress" })}\n`);
     const appendedAt = new Date(baseNow + 2_000);
     await fs.utimes(transcriptPath, appendedAt, appendedAt);
+    const observedMtimeMs = (await fs.stat(transcriptPath)).mtimeMs;
     // Content writes do not portably change the parent directory mtime. Pin it so only the child
     // mtime component of the tree stamp can invalidate this snapshot on every CI filesystem.
     await fs.utimes(projectDir, fixedDirectoryTime, fixedDirectoryTime);
 
     const refreshed = await listLocalClaudeSessionPage({}, home);
-    expect(initialUpdatedAt).not.toBe(appendedAt.getTime());
-    expect(refreshed.sessions.find((session) => session.threadId === sessionId)?.updatedAt).toBe(
-      appendedAt.getTime(),
-    );
+    const refreshedSession = refreshed.sessions.find((session) => session.threadId === sessionId);
+    if (!refreshedSession) {
+      throw new Error("expected refreshed session");
+    }
+    expect(initialUpdatedAt).not.toBe(observedMtimeMs);
+    expect(refreshedSession.updatedAt).toBe(observedMtimeMs);
   });
 
   it("invalidates the assembled scan after same-size same-mtime atomic replacement", async () => {
