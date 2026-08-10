@@ -1,0 +1,1437 @@
+name: Gateway r7 gateway/auth attribution C4 · Base vs P2
+run-name: Gateway r7 gateway/auth attribution C4 · run ${{ github.run_id }} attempt ${{ github.run_attempt }}
+
+on:
+  push:
+    branches:
+      - codex/evidence-gateway-r7-gateway-auth-attribution-c4
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r7-gateway-auth-attribution-c4
+  cancel-in-progress: false
+
+jobs:
+  attribution:
+    name: Hash-bound Base/P2 gateway-auth differential C4
+    runs-on: ubuntu-24.04
+    timeout-minutes: 135
+    permissions:
+      contents: read
+    env:
+      CI: "true"
+      TZ: UTC
+      NODE_OPTIONS: --max-old-space-size=8192
+      OPENCLAW_VITEST_NO_OUTPUT_TIMEOUT_MS: "300000"
+      OPENCLAW_VITEST_NO_OUTPUT_HEARTBEAT_MS: "30000"
+      BASE_SHA: 435e341a6ccd3db1f0d07504931f32385d10d6df
+      BASE_TREE: 916f825917a49da59c180a4cdabec3f0ce08227e
+      P_SHA: 7b89bf143d3c63e916847d58b92b5727fc16e4ca
+      P_TREE: 5f9eef5fd0c3e496910e2b3ab9db31023a43ca94
+      P2_SHA: 7492177a7068ca7481dd355f37b2d7a21630e9bc
+      P2_TREE: 39349f53cf8b6e5fbed55c8769ed5e5905965894
+      CUMULATIVE_DIFF_SHA256: 0232806223e4a84de70ad1a6901d9e537cc081fe2043454c0dfaf1a425b0b8d0
+      MIGRATION_TEST_BLOB_SHA: dce444298afc065faf6bc6148dbccc90f6015215
+      TRUSTED_PROXY_TEST_BLOB_SHA: b976c03c3adfb223685bb85d54293071278bb072
+      GATEWAY_SERVER_CONFIG_BLOB_SHA: bb4cbaec4947f5b61732478498a77d30ba83800a
+      SHARED_CONFIG_BLOB_SHA: 9c5342e3498633bc72a29b9639ac620b799f73f9
+      TIMEOUT_CONTRACT_BLOB_SHA: 5816139df0ac52117d330775267298a08082017a
+      RUN_VITEST_BLOB_SHA: 4f8b6d1abd0c94016f6c5f56f05ce219e8d9dfaa
+      PACKAGE_BLOB_SHA: f63ea7030f84032ec3021b3459084655dd584e9a
+      LOCK_BLOB_SHA: e9940a0c1404b1b6c584701351a93282f12bab77
+      EXPECTED_PACKAGE_MANAGER: pnpm@11.15.1+sha512.81350b07e53c9538a02f1f2303b4290fa2d7be04e56e2a970c4cc4b417dc761de196edabd49d55c7dc9580db81007c44143e4e3d7e462b3000d23c255122d065
+      EXPECTED_REPOSITORY: pcpilot-dev/openclaw
+      EXPECTED_REF: refs/heads/codex/evidence-gateway-r7-gateway-auth-attribution-c4
+      WORKFLOW_PATH: .github/workflows/r7-gateway-auth-attribution-c4.yml
+      HARNESS_DIR: ${{ github.workspace }}/harness
+      BASE_DIR: ${{ github.workspace }}/base
+      P2_DIR: ${{ github.workspace }}/p2
+      MIGRATION_FILE: src/gateway/server.control-ui-device-auth-migration.test.ts
+      TRUSTED_PROXY_FILE: src/gateway/server.auth.trusted-proxy-device-autoapprove.test.ts
+      CONFIG_FILE: test/vitest/vitest.gateway-server.config.ts
+      H14_COMMIT: 9319cdfc7e16b6f8bb72cad9cdf19cbb9db3ea1b
+      H14_RUN_ID: "31336661822"
+      H14_FINAL_MANIFEST_SHA256: 77f69b613b7505265891dc7d4142c38cf8534a04fa9bcec128f9f5647e04b12e
+      H14_MIGRATION_TARGET: Control UI device-auth upgrade migration keeps migration pending when existing operators cannot manage pairings
+      H14_TRUSTED_TARGET: trusted-proxy browser device auto-approval leaves mixed node and operator requests pending for manual approval
+      H14_RAW_APPEARANCE: RAW_FAILED_LOOKING
+      H14_FORMAL_STATUS: FORMAL_UNKNOWN
+      H14_REPORTER_COMPLETION: INCOMPLETE_REPORTER
+      C3_COMMIT: 409fef035a771a5b3cea44faee4ca644f2148858
+      C3_RUN_ID: "31342922316"
+      C3_RUN_ATTEMPT: "1"
+      C3_RUN_STATUS: completed
+      C3_RUN_CONCLUSION: failure
+      C3_JOB_LOG_FINGERPRINT_SHA256: ecc22c9bdeff7f333afb7ee60b0581eba20ef7f249bc160ec01adcabbb7cc9ea
+      C3_RAW_MAPS_DECISION: NO_DIFFERENTIAL_ALL_PASS
+      C3_FINALIZER_STATUS: PASS
+      C3_FINALIZER_COMPLETE: "true"
+      C3_FORMAL_STATUS: UNKNOWN/HARNESS_ERROR
+      C3_SEAL_FAILURE: EMPTY_SILENT_SUCCESS_LOG_POLICY
+      C3_ARTIFACTS: "0"
+      C3_FORMAL_PASS_CLAIM: "false"
+
+    steps:
+      - name: Initialize exact evidence envelope
+        id: initialize
+        shell: bash
+        timeout-minutes: 2
+        env:
+          EVIDENCE_DIR: ${{ runner.temp }}/r7-gateway-auth-attribution-c4
+          UPLOAD_DIR: ${{ runner.temp }}/r7-gateway-auth-attribution-c4-upload
+          BASE_STORE_DIR: ${{ runner.temp }}/r7-gateway-auth-base-store-c4
+          P2_STORE_DIR: ${{ runner.temp }}/r7-gateway-auth-p2-store-c4
+        run: |
+          set -euo pipefail
+          test -n "${RUNNER_TEMP:-}"
+          test -n "${GITHUB_ENV:-}"
+          test "$EVIDENCE_DIR" = "$RUNNER_TEMP/r7-gateway-auth-attribution-c4"
+          test "$UPLOAD_DIR" = "$RUNNER_TEMP/r7-gateway-auth-attribution-c4-upload"
+          test "$BASE_STORE_DIR" = "$RUNNER_TEMP/r7-gateway-auth-base-store-c4"
+          test "$P2_STORE_DIR" = "$RUNNER_TEMP/r7-gateway-auth-p2-store-c4"
+          test ! -e "$EVIDENCE_DIR"
+          test ! -e "$UPLOAD_DIR"
+          test ! -e "$BASE_STORE_DIR"
+          test ! -e "$P2_STORE_DIR"
+          {
+            printf 'EVIDENCE_DIR=%s\n' "$EVIDENCE_DIR"
+            printf 'UPLOAD_DIR=%s\n' "$UPLOAD_DIR"
+            printf 'BASE_STORE_DIR=%s\n' "$BASE_STORE_DIR"
+            printf 'P2_STORE_DIR=%s\n' "$P2_STORE_DIR"
+          } >> "$GITHUB_ENV"
+          mkdir "$EVIDENCE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/job.started"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/initialize.started"
+          printf '%s\n' 'candidate=C4' 'github_rerun=false' 'future_candidate_after_audit=0' 'third_candidate=false' > "$EVIDENCE_DIR/policy.txt"
+          printf '%s\n' 0 > "$EVIDENCE_DIR/initialize.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/initialize.ended"
+
+      - name: Checkout event harness C4
+        id: checkout_h
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ github.event.after }}
+          path: harness
+          fetch-depth: 2
+          persist-credentials: false
+          clean: true
+
+      - name: Guard event harness and runner identity
+        id: harness_guard
+        shell: bash
+        timeout-minutes: 5
+        env:
+          EVENT_AFTER: ${{ github.event.after }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_REPOSITORY: ${{ github.repository }}
+          EVENT_H_SHA: ${{ github.sha }}
+          WORKFLOW_H_SHA: ${{ github.workflow_sha }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUNNER_ENVIRONMENT_VALUE: ${{ runner.environment }}
+          RUNNER_OS_VALUE: ${{ runner.os }}
+          RUNNER_ARCH_VALUE: ${{ runner.arch }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/harness-guard.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$EVENT_NAME" = push
+            test "$EVENT_REPOSITORY" = "$EXPECTED_REPOSITORY"
+            test "$EVENT_REF" = "$EXPECTED_REF"
+            test "$RUN_ATTEMPT" = 1
+            test "$EVENT_AFTER" = "$EVENT_H_SHA"
+            test "$EVENT_AFTER" = "$WORKFLOW_H_SHA"
+            test "$EVENT_AFTER" != 0000000000000000000000000000000000000000
+            test "$RUNNER_ENVIRONMENT_VALUE" = github-hosted
+            test "$RUNNER_OS_VALUE" = Linux
+            test "$RUNNER_ARCH_VALUE" = X64
+            test -n "${ImageOS:-}"
+            test -n "${ImageVersion:-}"
+            test "$(git -C "$HARNESS_DIR" rev-parse HEAD)" = "$EVENT_AFTER"
+            read -r -a parents <<< "$(git -C "$HARNESS_DIR" rev-list --parents -n 1 "$EVENT_AFTER")"
+            test "${#parents[@]}" -eq 2
+            test "${parents[0]}" = "$EVENT_AFTER"
+            test "${parents[1]}" = "$P2_SHA"
+            mapfile -t paths < <(git -C "$HARNESS_DIR" diff-tree --no-commit-id --name-only -r "$EVENT_AFTER")
+            test "${#paths[@]}" -eq 1
+            test "${paths[0]}" = "$WORKFLOW_PATH"
+            test -f "$HARNESS_DIR/$WORKFLOW_PATH"
+            test ! -L "$HARNESS_DIR/$WORKFLOW_PATH"
+            test -z "$(git -C "$HARNESS_DIR" status --porcelain=v1 --untracked-files=all)"
+          ) > "$EVIDENCE_DIR/harness-guard.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/harness-guard.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/harness-guard.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/harness-guard.ended"
+          exit "$rc"
+
+      - name: Checkout detached clean Base
+        id: checkout_base
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: 435e341a6ccd3db1f0d07504931f32385d10d6df
+          path: base
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Checkout detached clean P2
+        id: checkout_p2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: 7492177a7068ca7481dd355f37b2d7a21630e9bc
+          path: p2
+          fetch-depth: 3
+          persist-credentials: false
+          clean: true
+
+      - name: Guard Base and P2 source contracts
+        id: source_guard
+        shell: bash
+        timeout-minutes: 8
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/source-guard.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(git -C "$BASE_DIR" rev-parse HEAD)" = "$BASE_SHA"
+            test "$(git -C "$BASE_DIR" rev-parse HEAD^{tree})" = "$BASE_TREE"
+            test "$(git -C "$P2_DIR" rev-parse HEAD)" = "$P2_SHA"
+            test "$(git -C "$P2_DIR" rev-parse HEAD^{tree})" = "$P2_TREE"
+            test "$(git -C "$P2_DIR" rev-parse HEAD^)" = "$P_SHA"
+            test "$(git -C "$P2_DIR" rev-parse HEAD^^)" = "$BASE_SHA"
+            test "$(git -C "$P2_DIR" rev-parse "$P_SHA^{tree}")" = "$P_TREE"
+            if git -C "$BASE_DIR" symbolic-ref -q HEAD || git -C "$P2_DIR" symbolic-ref -q HEAD; then exit 1; fi
+            test -z "$(git -C "$BASE_DIR" status --porcelain=v1 --untracked-files=all)"
+            test -z "$(git -C "$P2_DIR" status --porcelain=v1 --untracked-files=all)"
+            git -C "$P2_DIR" diff --check "$BASE_SHA" "$P2_SHA"
+            test "$(git -C "$P2_DIR" diff --full-index --binary "$BASE_SHA" "$P2_SHA" | sha256sum | awk '{print $1}')" = "$CUMULATIVE_DIFF_SHA256"
+            verify_blob() {
+              local path="$1" expected="$2"
+              test "$(git -C "$BASE_DIR" rev-parse "$BASE_SHA:$path")" = "$expected"
+              test "$(git -C "$P2_DIR" rev-parse "$P2_SHA:$path")" = "$expected"
+            }
+            verify_blob "$MIGRATION_FILE" "$MIGRATION_TEST_BLOB_SHA"
+            verify_blob "$TRUSTED_PROXY_FILE" "$TRUSTED_PROXY_TEST_BLOB_SHA"
+            verify_blob "$CONFIG_FILE" "$GATEWAY_SERVER_CONFIG_BLOB_SHA"
+            verify_blob test/vitest/vitest.shared.config.ts "$SHARED_CONFIG_BLOB_SHA"
+            verify_blob test/vitest/vitest.timeouts.ts "$TIMEOUT_CONTRACT_BLOB_SHA"
+            verify_blob scripts/run-vitest.mjs "$RUN_VITEST_BLOB_SHA"
+            verify_blob package.json "$PACKAGE_BLOB_SHA"
+            verify_blob pnpm-lock.yaml "$LOCK_BLOB_SHA"
+            test "$(grep -Ec '^  it\(' "$BASE_DIR/$MIGRATION_FILE")" -eq 13
+            test "$(grep -Ec '^  test\(' "$BASE_DIR/$TRUSTED_PROXY_FILE")" -eq 11
+            if grep -Eq '\.(skip|only|todo)\(' "$BASE_DIR/$MIGRATION_FILE" "$BASE_DIR/$TRUSTED_PROXY_FILE"; then exit 1; fi
+            grep -Fqx '      fileParallelism: false,' "$BASE_DIR/$CONFIG_FILE"
+            grep -Fqx '      intersectIncludeFile: true,' "$BASE_DIR/$CONFIG_FILE"
+            grep -Fqx '      isolate: false,' "$BASE_DIR/$CONFIG_FILE"
+            test "$(git -C "$BASE_DIR" show "$BASE_SHA:test/vitest/vitest.timeouts.ts" | tr -d '[:space:]')" = 'exportconstDEFAULT_VITEST_TEST_TIMEOUT_MS=120_000;'
+          ) > "$EVIDENCE_DIR/source-guard.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/source-guard.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/source-guard.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/source-guard.ended"
+          exit "$rc"
+
+      - name: Set up exact Node 24.15.0
+        id: setup_node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24.15.0
+
+      - name: Bind exact pnpm and absent stores
+        id: tooling
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/tooling.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(node --version)" = v24.15.0
+            test "$(node -p "require('$BASE_DIR/package.json').packageManager")" = "$EXPECTED_PACKAGE_MANAGER"
+            test "$(node -p "require('$P2_DIR/package.json').packageManager")" = "$EXPECTED_PACKAGE_MANAGER"
+            expected_pnpm="${EXPECTED_PACKAGE_MANAGER#pnpm@}"
+            expected_pnpm="${expected_pnpm%%+*}"
+            corepack enable
+            corepack prepare "$EXPECTED_PACKAGE_MANAGER" --activate
+            test "$(pnpm --version)" = "$expected_pnpm"
+            test -x /usr/bin/time
+            test ! -e "$BASE_STORE_DIR"
+            test ! -e "$P2_STORE_DIR"
+            test "$BASE_STORE_DIR" != "$P2_STORE_DIR"
+            node --version > "$EVIDENCE_DIR/node.version.txt"
+            pnpm --version > "$EVIDENCE_DIR/pnpm.version.txt"
+            printf '%s\n' "$EXPECTED_PACKAGE_MANAGER" > "$EVIDENCE_DIR/package-manager.txt"
+          ) > "$EVIDENCE_DIR/tooling.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/tooling.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/tooling.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/tooling.ended"
+          exit "$rc"
+
+      - name: Frozen install Base then P2 exactly once each
+        id: install_pair
+        shell: bash
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install-pair.started"
+          test ! -e "$BASE_STORE_DIR"
+          test ! -e "$P2_STORE_DIR"
+          mkdir "$BASE_STORE_DIR" "$P2_STORE_DIR"
+          set +e
+          (
+            cd "$BASE_DIR"
+            pnpm install --frozen-lockfile --store-dir "$BASE_STORE_DIR"
+          ) 2>&1 | tee "$EVIDENCE_DIR/base-install.log"
+          base_pipeline=("${PIPESTATUS[@]}")
+          base_rc="${base_pipeline[0]}"
+          if test "$base_rc" -eq 0; then base_rc="${base_pipeline[1]}"; fi
+          printf '%s\n' "$base_rc" > "$EVIDENCE_DIR/base-install.exit"
+          (
+            cd "$P2_DIR"
+            pnpm install --frozen-lockfile --store-dir "$P2_STORE_DIR"
+          ) 2>&1 | tee "$EVIDENCE_DIR/p2-install.log"
+          p2_pipeline=("${PIPESTATUS[@]}")
+          p2_rc="${p2_pipeline[0]}"
+          if test "$p2_rc" -eq 0; then p2_rc="${p2_pipeline[1]}"; fi
+          printf '%s\n' "$p2_rc" > "$EVIDENCE_DIR/p2-install.exit"
+          set -e
+          rc=0
+          if test "$base_rc" -ne 0 || test "$p2_rc" -ne 0; then rc=1; fi
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/install-pair.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install-pair.ended"
+          exit "$rc"
+
+      - name: Run Base three processes then P2 three processes
+        id: test_pair
+        shell: bash
+        timeout-minutes: 45
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/test-pair.started"
+          capture_resources() {
+            local label="$1"
+            date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/$label.started"
+            (
+              set -euo pipefail
+              printf 'captured_at_utc='; date -u +%Y-%m-%dT%H:%M:%SZ
+              printf 'nproc='; nproc
+              printf '[df]\n'; df -Pk "$GITHUB_WORKSPACE"
+              printf '[meminfo]\n'; awk '/^(MemTotal|MemFree|MemAvailable|SwapTotal|SwapFree):/ { print }' /proc/meminfo
+              for pressure in cpu memory io; do printf '[psi:%s]\n' "$pressure"; cat "/proc/pressure/$pressure"; done
+            ) > "$EVIDENCE_DIR/$label.resources.txt" 2>&1
+            local rc=$?
+            printf '%s\n' "$rc" > "$EVIDENCE_DIR/$label.exit"
+            date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/$label.ended"
+          }
+          finish_run() {
+            local stem="$1" pipeline_name="$2"
+            local -n values="$pipeline_name"
+            local rc="${values[0]}"
+            if test "$rc" -eq 0; then rc="${values[1]}"; fi
+            printf '%s\n' "$rc" > "$EVIDENCE_DIR/$stem.exit"
+            date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/$stem.ended"
+          }
+          set +e
+          capture_resources base-migration-before
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/base-migration.started"
+          printf '%s\n' "node scripts/run-vitest.mjs run --config test/vitest/vitest.gateway-server.config.ts $MIGRATION_FILE --reporter=verbose --reporter=json --outputFile.json=$EVIDENCE_DIR/base-migration.vitest.json" > "$EVIDENCE_DIR/base-migration.command.txt"
+          (cd "$BASE_DIR" && GITHUB_WORKSPACE="$BASE_DIR" /usr/bin/time -v -o "$EVIDENCE_DIR/base-migration.time" \
+            node scripts/run-vitest.mjs run --config test/vitest/vitest.gateway-server.config.ts \
+              src/gateway/server.control-ui-device-auth-migration.test.ts \
+              --reporter=verbose --reporter=json --outputFile.json="$EVIDENCE_DIR/base-migration.vitest.json") \
+            2>&1 | tee "$EVIDENCE_DIR/base-migration.log"
+          base_migration_pipeline=("${PIPESTATUS[@]}"); finish_run base-migration base_migration_pipeline
+          capture_resources base-migration-after
+
+          capture_resources base-trusted-proxy-before
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/base-trusted-proxy.started"
+          printf '%s\n' "node scripts/run-vitest.mjs run --config test/vitest/vitest.gateway-server.config.ts $TRUSTED_PROXY_FILE --reporter=verbose --reporter=json --outputFile.json=$EVIDENCE_DIR/base-trusted-proxy.vitest.json" > "$EVIDENCE_DIR/base-trusted-proxy.command.txt"
+          (cd "$BASE_DIR" && GITHUB_WORKSPACE="$BASE_DIR" /usr/bin/time -v -o "$EVIDENCE_DIR/base-trusted-proxy.time" \
+            node scripts/run-vitest.mjs run --config test/vitest/vitest.gateway-server.config.ts \
+              src/gateway/server.auth.trusted-proxy-device-autoapprove.test.ts \
+              --reporter=verbose --reporter=json --outputFile.json="$EVIDENCE_DIR/base-trusted-proxy.vitest.json") \
+            2>&1 | tee "$EVIDENCE_DIR/base-trusted-proxy.log"
+          base_trusted_proxy_pipeline=("${PIPESTATUS[@]}"); finish_run base-trusted-proxy base_trusted_proxy_pipeline
+          capture_resources base-trusted-proxy-after
+
+          capture_resources base-joint-before
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/base-joint.started"
+          printf '%s\n' "node scripts/run-vitest.mjs run --config test/vitest/vitest.gateway-server.config.ts $MIGRATION_FILE $TRUSTED_PROXY_FILE --reporter=verbose --reporter=json --outputFile.json=$EVIDENCE_DIR/base-joint.vitest.json" > "$EVIDENCE_DIR/base-joint.command.txt"
+          (cd "$BASE_DIR" && GITHUB_WORKSPACE="$BASE_DIR" /usr/bin/time -v -o "$EVIDENCE_DIR/base-joint.time" \
+            node scripts/run-vitest.mjs run --config test/vitest/vitest.gateway-server.config.ts \
+              src/gateway/server.control-ui-device-auth-migration.test.ts \
+              src/gateway/server.auth.trusted-proxy-device-autoapprove.test.ts \
+              --reporter=verbose --reporter=json --outputFile.json="$EVIDENCE_DIR/base-joint.vitest.json") \
+            2>&1 | tee "$EVIDENCE_DIR/base-joint.log"
+          base_joint_pipeline=("${PIPESTATUS[@]}"); finish_run base-joint base_joint_pipeline
+          capture_resources base-joint-after
+
+          capture_resources p2-migration-before
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/p2-migration.started"
+          printf '%s\n' "node scripts/run-vitest.mjs run --config test/vitest/vitest.gateway-server.config.ts $MIGRATION_FILE --reporter=verbose --reporter=json --outputFile.json=$EVIDENCE_DIR/p2-migration.vitest.json" > "$EVIDENCE_DIR/p2-migration.command.txt"
+          (cd "$P2_DIR" && GITHUB_WORKSPACE="$P2_DIR" /usr/bin/time -v -o "$EVIDENCE_DIR/p2-migration.time" \
+            node scripts/run-vitest.mjs run --config test/vitest/vitest.gateway-server.config.ts \
+              src/gateway/server.control-ui-device-auth-migration.test.ts \
+              --reporter=verbose --reporter=json --outputFile.json="$EVIDENCE_DIR/p2-migration.vitest.json") \
+            2>&1 | tee "$EVIDENCE_DIR/p2-migration.log"
+          p2_migration_pipeline=("${PIPESTATUS[@]}"); finish_run p2-migration p2_migration_pipeline
+          capture_resources p2-migration-after
+
+          capture_resources p2-trusted-proxy-before
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/p2-trusted-proxy.started"
+          printf '%s\n' "node scripts/run-vitest.mjs run --config test/vitest/vitest.gateway-server.config.ts $TRUSTED_PROXY_FILE --reporter=verbose --reporter=json --outputFile.json=$EVIDENCE_DIR/p2-trusted-proxy.vitest.json" > "$EVIDENCE_DIR/p2-trusted-proxy.command.txt"
+          (cd "$P2_DIR" && GITHUB_WORKSPACE="$P2_DIR" /usr/bin/time -v -o "$EVIDENCE_DIR/p2-trusted-proxy.time" \
+            node scripts/run-vitest.mjs run --config test/vitest/vitest.gateway-server.config.ts \
+              src/gateway/server.auth.trusted-proxy-device-autoapprove.test.ts \
+              --reporter=verbose --reporter=json --outputFile.json="$EVIDENCE_DIR/p2-trusted-proxy.vitest.json") \
+            2>&1 | tee "$EVIDENCE_DIR/p2-trusted-proxy.log"
+          p2_trusted_proxy_pipeline=("${PIPESTATUS[@]}"); finish_run p2-trusted-proxy p2_trusted_proxy_pipeline
+          capture_resources p2-trusted-proxy-after
+
+          capture_resources p2-joint-before
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/p2-joint.started"
+          printf '%s\n' "node scripts/run-vitest.mjs run --config test/vitest/vitest.gateway-server.config.ts $MIGRATION_FILE $TRUSTED_PROXY_FILE --reporter=verbose --reporter=json --outputFile.json=$EVIDENCE_DIR/p2-joint.vitest.json" > "$EVIDENCE_DIR/p2-joint.command.txt"
+          (cd "$P2_DIR" && GITHUB_WORKSPACE="$P2_DIR" /usr/bin/time -v -o "$EVIDENCE_DIR/p2-joint.time" \
+            node scripts/run-vitest.mjs run --config test/vitest/vitest.gateway-server.config.ts \
+              src/gateway/server.control-ui-device-auth-migration.test.ts \
+              src/gateway/server.auth.trusted-proxy-device-autoapprove.test.ts \
+              --reporter=verbose --reporter=json --outputFile.json="$EVIDENCE_DIR/p2-joint.vitest.json") \
+            2>&1 | tee "$EVIDENCE_DIR/p2-joint.log"
+          p2_joint_pipeline=("${PIPESTATUS[@]}"); finish_run p2-joint p2_joint_pipeline
+          capture_resources p2-joint-after
+          set -e
+
+          set +e
+          EVIDENCE_DIR="$EVIDENCE_DIR" python3 - 2>&1 <<'PY' | tee "$EVIDENCE_DIR/validator.log"
+          import json
+          import os
+          import re
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          migration_file = os.environ["MIGRATION_FILE"]
+          proxy_file = os.environ["TRUSTED_PROXY_FILE"]
+          migration_names = [
+              "Control UI device-auth upgrade migration retains only the migration session bound to the approved public key",
+              "Control UI device-auth upgrade migration keeps a device-less legacy browser online with secure-context remediation",
+              "Control UI device-auth upgrade migration preserves trusted-proxy migration access",
+              "Control UI device-auth upgrade migration preserves trusted-proxy scope caps during migration",
+              "Control UI device-auth upgrade migration completes imported migration state when an effective operator already exists",
+              "Control UI device-auth upgrade migration keeps migration pending when existing operators cannot manage pairings",
+              "Control UI device-auth upgrade migration rejects an in-flight migration handshake completed before registration",
+              "Control UI device-auth upgrade migration keeps only the signed legacy browser online until it explicitly pairs",
+              "Control UI device-auth upgrade migration does not silently auto-approve a local signed migration browser",
+              "Control UI device-auth upgrade migration adds pairing capability when a migrating browser requested read-only access",
+              "Control UI device-auth upgrade migration rejects a device-less migration handshake when an operator is already paired",
+              "Control UI device-auth upgrade migration closes competing migration sessions and keeps the winner self-only until reconnect",
+              "Control UI device-auth upgrade migration denies a stale migration session after another operator is paired",
+          ]
+          proxy_names = [
+              "trusted-proxy browser device auto-approval auto-approves operator.admin and warns once at startup",
+              "trusted-proxy browser device auto-approval auto-approves a new browser device with the default scopes",
+              "trusted-proxy browser device auto-approval caps requested scopes to the configured intersection",
+              "trusted-proxy browser device auto-approval leaves mixed node and operator requests pending for manual approval",
+              "trusted-proxy browser device auto-approval caps omitted scopes to the declared proxy scopes",
+              "trusted-proxy browser device auto-approval caps requested scopes to the declared proxy scopes",
+              "trusted-proxy browser device auto-approval keeps configured and requested scope behavior when the proxy header is absent",
+              "trusted-proxy browser device auto-approval auto-approves same-key scope upgrades on existing devices",
+              "trusted-proxy browser device auto-approval rejects a foreign-key connect for an already-paired deviceId",
+              "trusted-proxy browser device auto-approval leaves trusted-proxy pairing unchanged when auto-approval is disabled",
+              "trusted-proxy browser device auto-approval does not auto-approve token-authenticated browser devices",
+          ]
+          target_names = {
+              migration_file: "Control UI device-auth upgrade migration keeps migration pending when existing operators cannot manage pairings",
+              proxy_file: "trusted-proxy browser device auto-approval leaves mixed node and operator requests pending for manual approval",
+          }
+          assertions_by_file = {migration_file: migration_names, proxy_file: proxy_names}
+          if target_names[migration_file] != os.environ["H14_MIGRATION_TARGET"]:
+              raise SystemExit("migration target/H14 history binding mismatch")
+          if target_names[proxy_file] != os.environ["H14_TRUSTED_TARGET"]:
+              raise SystemExit("trusted-proxy target/H14 history binding mismatch")
+          if len(migration_names) != 13 or len(proxy_names) != 11:
+              raise SystemExit("invalid frozen assertion cardinality")
+          if any(len(names) != len(set(names)) for names in assertions_by_file.values()):
+              raise SystemExit("duplicate frozen assertion name")
+
+          def regular(path: Path) -> bool:
+              return path.is_file() and not path.is_symlink()
+
+          def integer(path: Path, errors: list[str]) -> int | None:
+              if not regular(path):
+                  errors.append(f"missing regular integer evidence: {path.name}")
+                  return None
+              text = path.read_text(encoding="utf-8").strip()
+              if re.fullmatch(r"[0-9]+", text) is None:
+                  errors.append(f"malformed integer evidence: {path.name}")
+                  return None
+              return int(text)
+
+          def utc(path: Path, errors: list[str]) -> datetime | None:
+              if not regular(path):
+                  errors.append(f"missing regular UTC evidence: {path.name}")
+                  return None
+              raw = path.read_bytes()
+              if len(raw) != 21 or raw[-1:] != b"\n":
+                  errors.append(f"malformed UTC bytes: {path.name}")
+                  return None
+              try:
+                  value = datetime.strptime(raw[:-1].decode("ascii"), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+              except (UnicodeDecodeError, ValueError):
+                  errors.append(f"malformed UTC value: {path.name}")
+                  return None
+              return value
+
+          def interval(stem: str, errors: list[str]) -> None:
+              start = utc(evidence / f"{stem}.started", errors)
+              end = utc(evidence / f"{stem}.ended", errors)
+              if start is not None and end is not None and start > end:
+                  errors.append(f"inverted UTC interval: {stem}")
+
+          def resources(stem: str, errors: list[str]) -> None:
+              interval(stem, errors)
+              if integer(evidence / f"{stem}.exit", errors) != 0:
+                  errors.append(f"resource capture failed: {stem}")
+              path = evidence / f"{stem}.resources.txt"
+              if not regular(path):
+                  errors.append(f"missing resource evidence: {stem}")
+                  return
+              text = path.read_text(encoding="utf-8", errors="replace")
+              for marker in ["captured_at_utc=", "nproc=", "[df]", "Filesystem", "[meminfo]", "MemTotal:", "MemAvailable:", "[psi:cpu]", "[psi:memory]", "[psi:io]"]:
+                  if marker not in text:
+                      errors.append(f"missing resource marker {marker!r}: {stem}")
+
+          def normalized_file(name: object) -> str | None:
+              if not isinstance(name, str):
+                  return None
+              value = name.replace("\\", "/")
+              for expected in assertions_by_file:
+                  if value == expected or value.endswith(f"/{expected}"):
+                      return expected
+              return None
+
+          def count(report: dict, key: str, errors: list[str]) -> int | None:
+              value = report.get(key)
+              if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+                  errors.append(f"{key} must be a nonnegative integer")
+                  return None
+              return value
+
+          def watchdog(stem: str, exit_code: int | None, errors: list[str]) -> dict:
+              path = evidence / f"{stem}.log"
+              if not regular(path):
+                  errors.append(f"missing regular log: {stem}")
+                  return {"completion": "HARNESS_ERROR"}
+              lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+              command = (evidence / f"{stem}.command.txt").read_text(encoding="utf-8").strip() if regular(evidence / f"{stem}.command.txt") else None
+              if command is None:
+                  errors.append(f"missing command binding: {stem}")
+              args = command.removeprefix("node scripts/run-vitest.mjs ") if command else ""
+              terminal = f"[vitest] no output for 300000ms; terminating stalled Vitest process group ({args})."
+              force = f"[vitest] process group still alive after 5000ms; sending SIGKILL ({args})."
+              terminal_count = lines.count(terminal)
+              force_count = lines.count(force)
+              foreign = [line for line in lines if line.startswith("[vitest] no output for ") and line != terminal]
+              foreign += [line for line in lines if line.startswith("[vitest] process group still alive after ") and line != force]
+              if foreign or terminal_count > 1 or force_count > 1:
+                  errors.append(f"foreign or ambiguous watchdog marker: {stem}")
+                  return {"completion": "HARNESS_ERROR"}
+              signal = exit_code - 128 if isinstance(exit_code, int) and exit_code > 128 else None
+              if terminal_count == 1:
+                  expected_heartbeats = [f"[vitest] still running with no output for {ms}ms ({args})." for ms in range(30000, 300000, 30000)]
+                  terminal_index = lines.index(terminal)
+                  epoch = lines[max(0, terminal_index - len(expected_heartbeats)):terminal_index]
+                  if epoch != expected_heartbeats:
+                      errors.append(f"incomplete watchdog heartbeat epoch: {stem}")
+                      return {"completion": "HARNESS_ERROR"}
+                  if exit_code == 143 and force_count == 0:
+                      return {"completion": "INCOMPLETE", "origin": "REPO_NATIVE_NO_OUTPUT_WATCHDOG", "exit": exit_code, "signal": signal, "silenceMs": 300000, "heartbeatMs": 30000}
+                  if exit_code == 137 and force_count == 1 and lines.index(force) > terminal_index:
+                      return {"completion": "INCOMPLETE", "origin": "REPO_NATIVE_NO_OUTPUT_WATCHDOG", "exit": exit_code, "signal": signal, "silenceMs": 300000, "heartbeatMs": 30000}
+                  errors.append(f"contradictory watchdog exit/marker pair: {stem}")
+                  return {"completion": "HARNESS_ERROR"}
+              if force_count:
+                  errors.append(f"force-kill marker lacks terminal marker: {stem}")
+                  return {"completion": "HARNESS_ERROR"}
+              return {"completion": "COMPLETE", "origin": "NONE", "exit": exit_code, "signal": signal, "silenceMs": 300000, "heartbeatMs": 30000}
+
+          def parse(stem: str, expected_files: list[str]) -> dict:
+              errors: list[str] = []
+              interval(stem, errors)
+              resources(f"{stem}-before", errors)
+              resources(f"{stem}-after", errors)
+              exit_code = integer(evidence / f"{stem}.exit", errors)
+              watch = watchdog(stem, exit_code, errors)
+              if watch.get("completion") == "INCOMPLETE":
+                  return {"status": "INCOMPLETE", "completion": "INCOMPLETE", "exitCode": exit_code, "watchdog": watch, "errors": errors}
+              if watch.get("completion") == "HARNESS_ERROR":
+                  return {"status": "HARNESS_ERROR", "completion": "HARNESS_ERROR", "exitCode": exit_code, "watchdog": watch, "errors": errors}
+              if exit_code not in {0, 1}:
+                  errors.append(f"unsupported complete exit: {exit_code!r}")
+              time_path = evidence / f"{stem}.time"
+              if not regular(time_path) or time_path.stat().st_size == 0:
+                  errors.append(f"missing GNU time evidence: {stem}")
+              else:
+                  time_text = time_path.read_text(encoding="utf-8", errors="replace")
+                  for marker in ["Command being timed:", "User time (seconds):", "System time (seconds):", "Elapsed (wall clock) time", "Maximum resident set size (kbytes):", "Exit status:"]:
+                      if marker not in time_text:
+                          errors.append(f"missing GNU time marker {marker!r}: {stem}")
+                  match = re.search(r"^\s*Exit status:\s*(\d+)\s*$", time_text, re.MULTILINE)
+                  if match is None or exit_code is None or int(match.group(1)) != exit_code:
+                      errors.append(f"GNU time/test exit mismatch: {stem}")
+              report_path = evidence / f"{stem}.vitest.json"
+              if not regular(report_path):
+                  errors.append(f"missing regular JSON report: {stem}")
+                  return {"status": "HARNESS_ERROR", "completion": "HARNESS_ERROR", "exitCode": exit_code, "watchdog": watch, "errors": errors}
+              try:
+                  report = json.loads(report_path.read_text(encoding="utf-8"))
+              except (OSError, json.JSONDecodeError) as exc:
+                  errors.append(f"malformed JSON report: {exc}")
+                  return {"status": "HARNESS_ERROR", "completion": "HARNESS_ERROR", "exitCode": exit_code, "watchdog": watch, "errors": errors}
+              results = report.get("testResults")
+              if not isinstance(results, list):
+                  errors.append("testResults must be a list")
+                  results = []
+              by_file: dict[str, dict] = {}
+              status_maps: dict[str, dict[str, str]] = {}
+              all_assertions: list[dict] = []
+              for result in results:
+                  if not isinstance(result, dict):
+                      errors.append("testResults entry must be an object")
+                      continue
+                  file_name = normalized_file(result.get("name"))
+                  if file_name is None or file_name in by_file:
+                      errors.append(f"foreign or duplicate test file: {result.get('name')!r}")
+                      continue
+                  by_file[file_name] = result
+                  assertions = result.get("assertionResults")
+                  if not isinstance(assertions, list) or any(not isinstance(item, dict) for item in assertions):
+                      errors.append(f"malformed assertionResults: {file_name}")
+                      continue
+                  all_assertions.extend(assertions)
+                  names = [item.get("fullName") for item in assertions]
+                  if sorted(names, key=str) != sorted(assertions_by_file[file_name]):
+                      errors.append(f"all file assertions do not match frozen contract: {file_name}")
+                  if len(names) != len(set(names)):
+                      errors.append(f"duplicate assertion fullName: {file_name}")
+                  statuses = [item.get("status") for item in assertions]
+                  if any(status not in {"passed", "failed"} for status in statuses):
+                      errors.append(f"non-executed assertion: {file_name}")
+                  status_map: dict[str, str] = {}
+                  for item in assertions:
+                      full_name = item.get("fullName")
+                      assertion_status = item.get("status")
+                      if isinstance(full_name, str) and assertion_status in {"passed", "failed"}:
+                          if full_name in status_map:
+                              errors.append(f"duplicate assertion map key: {file_name}: {full_name}")
+                          status_map[full_name] = assertion_status
+                  if set(status_map) != set(assertions_by_file[file_name]):
+                      errors.append(f"assertion status map key set mismatch: {file_name}")
+                  status_maps[file_name] = dict(sorted(status_map.items()))
+                  expected_file_status = "failed" if "failed" in statuses else "passed"
+                  if result.get("status") != expected_file_status:
+                      errors.append(f"file/assertion status mismatch: {file_name}")
+                  target = target_names[file_name]
+                  if sum(item.get("fullName") == target for item in assertions) != 1:
+                      errors.append(f"explicit target assertion missing or duplicated: {file_name}")
+              if set(by_file) != set(expected_files) or len(results) != len(expected_files):
+                  errors.append(f"exact target file set mismatch: {sorted(by_file)!r}")
+              expected_total = sum(len(assertions_by_file[path]) for path in expected_files)
+              counts = {key: count(report, key, errors) for key in [
+                  "numTotalTests", "numPassedTests", "numFailedTests", "numPendingTests", "numTodoTests",
+                  "numTotalTestSuites", "numPassedTestSuites", "numFailedTestSuites", "numPendingTestSuites",
+              ]}
+              passed = sum(item.get("status") == "passed" for item in all_assertions)
+              failed = sum(item.get("status") == "failed" for item in all_assertions)
+              if len(all_assertions) != expected_total:
+                  errors.append("assertion cardinality mismatch")
+              if counts["numTotalTests"] != expected_total or counts["numPassedTests"] != passed or counts["numFailedTests"] != failed:
+                  errors.append("global test counts do not match assertions")
+              if counts["numPendingTests"] != 0 or counts["numTodoTests"] != 0 or passed + failed != expected_total:
+                  errors.append("pending/todo/non-executed tests are forbidden")
+              suite_values = [counts[key] for key in ["numTotalTestSuites", "numPassedTestSuites", "numFailedTestSuites", "numPendingTestSuites"]]
+              if all(value is not None for value in suite_values):
+                  total_suites, passed_suites, failed_suites, pending_suites = suite_values
+                  if total_suites <= 0 or passed_suites + failed_suites + pending_suites != total_suites:
+                      errors.append("suite counts are not coherent")
+                  if pending_suites != 0:
+                      errors.append("pending suites are forbidden")
+              success = report.get("success")
+              pass_contract = success is True and exit_code == 0 and failed == 0 and counts["numFailedTestSuites"] == 0 and counts["numPassedTestSuites"] == counts["numTotalTestSuites"]
+              fail_contract = success is False and exit_code == 1 and failed > 0 and counts["numFailedTestSuites"] is not None and counts["numFailedTestSuites"] > 0
+              if errors:
+                  status = "HARNESS_ERROR"
+              elif pass_contract:
+                  status = "PASS"
+              elif fail_contract:
+                  status = "FAIL"
+              else:
+                  status = "HARNESS_ERROR"
+                  errors.append("report/file/suite/assertion/exit contract is incoherent")
+              return {
+                  "status": status, "completion": "COMPLETE" if status in {"PASS", "FAIL"} else "HARNESS_ERROR",
+                  "exitCode": exit_code, "expectedFiles": expected_files, "reportedFileCount": len(results),
+                  "suiteCountIndependentOfFileCount": True, "counts": counts,
+                  "assertions": {"passed": passed, "failed": failed, "total": len(all_assertions)},
+                  "assertionStatusByFile": status_maps,
+                  "targetStatuses": {
+                      path: status_maps.get(path, {}).get(target_names[path]) for path in expected_files
+                  },
+                  "targets": [target_names[path] for path in expected_files], "watchdog": watch, "errors": errors,
+              }
+
+          runs = {
+              "base": {
+                  "migration": parse("base-migration", [migration_file]),
+                  "trustedProxy": parse("base-trusted-proxy", [proxy_file]),
+                  "joint": parse("base-joint", [migration_file, proxy_file]),
+              },
+              "p2": {
+                  "migration": parse("p2-migration", [migration_file]),
+                  "trustedProxy": parse("p2-trusted-proxy", [proxy_file]),
+                  "joint": parse("p2-joint", [migration_file, proxy_file]),
+              },
+          }
+          base = tuple(runs["base"][name]["status"] for name in ["migration", "trustedProxy", "joint"])
+          p2 = tuple(runs["p2"][name]["status"] for name in ["migration", "trustedProxy", "joint"])
+          process_files = {
+              "migration": [migration_file],
+              "trustedProxy": [proxy_file],
+              "joint": [migration_file, proxy_file],
+          }
+
+          def validated_maps(run: dict, expected_files: list[str]) -> tuple[dict, dict, dict, list[str]]:
+              errors: list[str] = []
+              maps = run.get("assertionStatusByFile")
+              if not isinstance(maps, dict) or set(maps) != set(expected_files):
+                  errors.append("missing, foreign, or incomplete assertionStatusByFile set")
+                  maps = maps if isinstance(maps, dict) else {}
+              normalized: dict[str, dict[str, str]] = {}
+              flattened: dict[str, str] = {}
+              targets: dict[str, str | None] = {}
+              for file_name in expected_files:
+                  status_map = maps.get(file_name)
+                  expected_names = set(assertions_by_file[file_name])
+                  if not isinstance(status_map, dict) or set(status_map) != expected_names:
+                      errors.append(f"missing, foreign, duplicate-derived, or tampered map keys: {file_name}")
+                      status_map = status_map if isinstance(status_map, dict) else {}
+                  clean_map: dict[str, str] = {}
+                  for full_name, assertion_status in status_map.items():
+                      if not isinstance(full_name, str) or assertion_status not in {"passed", "failed"}:
+                          errors.append(f"invalid assertion map entry: {file_name}: {full_name!r}")
+                          continue
+                      if full_name in flattened:
+                          errors.append(f"duplicate cross-file assertion name: {full_name}")
+                      clean_map[full_name] = assertion_status
+                      flattened[full_name] = assertion_status
+                  normalized[file_name] = dict(sorted(clean_map.items()))
+                  targets[file_name] = clean_map.get(target_names[file_name])
+                  if targets[file_name] not in {"passed", "failed"}:
+                      errors.append(f"missing target status: {file_name}")
+              derived_status = "FAIL" if "failed" in flattened.values() else "PASS"
+              if run.get("status") != derived_status:
+                  errors.append("process status does not match assertion status maps")
+              if run.get("completion") != "COMPLETE":
+                  errors.append("process maps are not from a complete reporter")
+              return normalized, flattened, targets, errors
+
+          comparisons = {}
+          comparison_errors: list[str] = []
+          for process_name, expected_files in process_files.items():
+              base_maps, base_flat, base_targets, base_errors = validated_maps(
+                  runs["base"][process_name], expected_files
+              )
+              p2_maps, p2_flat, p2_targets, p2_errors = validated_maps(
+                  runs["p2"][process_name], expected_files
+              )
+              errors = [f"base: {error}" for error in base_errors]
+              errors.extend(f"p2: {error}" for error in p2_errors)
+              comparison_errors.extend(f"{process_name}: {error}" for error in errors)
+              common_names = sorted(set(base_flat) & set(p2_flat))
+              new_p2_failures = [
+                  name for name in common_names
+                  if base_flat[name] == "passed" and p2_flat[name] == "failed"
+              ]
+              resolved_base_failures = [
+                  name for name in common_names
+                  if base_flat[name] == "failed" and p2_flat[name] == "passed"
+              ]
+              unchanged_failures = [
+                  name for name in common_names
+                  if base_flat[name] == "failed" and p2_flat[name] == "failed"
+              ]
+              comparisons[process_name] = {
+                  "assertionStatusMaps": {"base": base_maps, "p2": p2_maps},
+                  "targetStatuses": {"base": base_targets, "p2": p2_targets},
+                  "newP2Failures": new_p2_failures,
+                  "resolvedBaseFailures": resolved_base_failures,
+                  "unchangedFailures": unchanged_failures,
+                  "mapsEqual": base_maps == p2_maps,
+                  "baseAllPass": bool(base_flat) and all(status == "passed" for status in base_flat.values()),
+                  "p2AllPass": bool(p2_flat) and all(status == "passed" for status in p2_flat.values()),
+                  "errors": errors,
+              }
+
+          complete = (
+              all(status in {"PASS", "FAIL"} for status in base + p2)
+              and not comparison_errors
+          )
+          decision = "UNKNOWN"
+          source_scope = "STOP"
+          p2_scope = "STOP"
+          heavy = "BLOCKED"
+          reason = "UNKNOWN/INCOMPLETE/HARNESS_ERROR, missing/tampered map, or incoherent evidence; STOP without retry"
+          if complete:
+              isolated_all_pass = all(
+                  comparisons[name]["baseAllPass"] and comparisons[name]["p2AllPass"]
+                  for name in ["migration", "trustedProxy"]
+              )
+              joint_equal_failure = (
+                  comparisons["joint"]["mapsEqual"]
+                  and bool(comparisons["joint"]["unchangedFailures"])
+              )
+              new_isolated = any(
+                  comparisons[name]["newP2Failures"] for name in ["migration", "trustedProxy"]
+              )
+              new_joint = bool(comparisons["joint"]["newP2Failures"])
+              any_new = new_isolated or new_joint
+              any_resolved = any(
+                  comparisons[name]["resolvedBaseFailures"]
+                  for name in ["migration", "trustedProxy", "joint"]
+              )
+              all_maps_equal = all(
+                  comparisons[name]["mapsEqual"]
+                  for name in ["migration", "trustedProxy", "joint"]
+              )
+              any_unchanged_failure = any(
+                  comparisons[name]["unchangedFailures"]
+                  for name in ["migration", "trustedProxy", "joint"]
+              )
+              if isolated_all_pass and joint_equal_failure:
+                  decision, source_scope, p2_scope = "BASELINE_SHARED_PROCESS_INTERACTION", "CLOSED", "CLOSED"
+                  reason = "isolated maps are fully PASS and Base/P2 joint maps are exactly equal with failures"
+              elif new_isolated:
+                  decision, source_scope, p2_scope = "P2_DIFFERENTIAL", "REOPEN", "REOPEN"
+                  reason = "one or more isolated assertions newly fail on P2"
+              elif new_joint:
+                  decision, source_scope, p2_scope = "P2_INTERACTION_DIFFERENTIAL", "REOPEN", "REOPEN"
+                  reason = "one or more joint-process assertions newly fail on P2"
+              elif all_maps_equal and any_unchanged_failure:
+                  decision, source_scope, p2_scope = "BASELINE_COMPATIBLE_FAIL", "CLOSED", "CLOSED"
+                  reason = "all three corresponding assertion status maps are exactly equal and include failures"
+              elif any_resolved and not any_new:
+                  decision, source_scope, p2_scope = "BASELINE_ONLY_IMPROVEMENT", "CLOSED", "CLOSED"
+                  reason = "Base-only assertion failures resolve on P2 with no new P2 failure"
+              elif all_maps_equal and not any_unchanged_failure:
+                  decision, source_scope, p2_scope, heavy = "NO_DIFFERENTIAL_ALL_PASS", "CLOSED", "CLOSED", "NOT_EVALUATED_BY_ATTRIBUTION"
+                  reason = "all six assertion status maps are fully PASS; this is not Heavy-GREEN"
+              else:
+                  reason = "complete maps form an unhandled combination; STOP without retry"
+          result = {
+              "schema": "openclaw.gateway-r7-gateway-auth-attribution-c4.v1",
+              "decision": decision, "complete": complete and decision != "UNKNOWN",
+              "baseVector": list(base), "p2Vector": list(p2), "runs": runs,
+              "targets": {
+                  "migration": target_names[migration_file],
+                  "trustedProxy": target_names[proxy_file],
+              },
+              "comparisons": comparisons,
+              "comparisonErrors": comparison_errors,
+              "disposition": {"sourceScope": source_scope, "p2": p2_scope, "heavy": heavy, "action": "STOP" if decision == "UNKNOWN" else "AUDIT"},
+              "reason": reason,
+              "retry": {"githubRerunAllowed": False, "futureCandidateAttemptsAllowedAfterAudit": 0, "thirdCandidateAllowed": False, "cacheMutationAllowed": False, "sourceMutationAllowed": False},
+          }
+          (evidence / "attribution.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps({"decision": decision, "base": base, "p2": p2, "complete": result["complete"]}, sort_keys=True))
+          sys.exit(0 if result["complete"] else 1)
+          PY
+          validator_pipeline=("${PIPESTATUS[@]}")
+          validator_rc="${validator_pipeline[0]}"
+          if test "$validator_rc" -eq 0; then validator_rc="${validator_pipeline[1]}"; fi
+          set -e
+          printf '%s\n' "$validator_rc" > "$EVIDENCE_DIR/validator.exit"
+          pair_rc=1
+          if test "$validator_rc" -eq 0 && test "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["decision"])' "$EVIDENCE_DIR/attribution.json")" = NO_DIFFERENTIAL_ALL_PASS; then pair_rc=0; fi
+          printf '%s\n' "$pair_rc" > "$EVIDENCE_DIR/test-pair.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/test-pair.ended"
+          exit "$pair_rc"
+
+      - name: Guard final source poststate
+        id: poststate
+        if: always()
+        shell: bash
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/poststate.started"
+          set +e
+          (
+            set -euo pipefail
+            test "$(git -C "$BASE_DIR" rev-parse HEAD)" = "$BASE_SHA"
+            test "$(git -C "$BASE_DIR" rev-parse HEAD^{tree})" = "$BASE_TREE"
+            test "$(git -C "$P2_DIR" rev-parse HEAD)" = "$P2_SHA"
+            test "$(git -C "$P2_DIR" rev-parse HEAD^{tree})" = "$P2_TREE"
+            if git -C "$BASE_DIR" symbolic-ref -q HEAD || git -C "$P2_DIR" symbolic-ref -q HEAD; then exit 1; fi
+            test -z "$(git -C "$BASE_DIR" status --porcelain=v1 --untracked-files=all)"
+            test -z "$(git -C "$P2_DIR" status --porcelain=v1 --untracked-files=all)"
+            test "$(git -C "$BASE_DIR" rev-parse "$BASE_SHA:$MIGRATION_FILE")" = "$MIGRATION_TEST_BLOB_SHA"
+            test "$(git -C "$P2_DIR" rev-parse "$P2_SHA:$TRUSTED_PROXY_FILE")" = "$TRUSTED_PROXY_TEST_BLOB_SHA"
+          ) > "$EVIDENCE_DIR/poststate.log" 2>&1
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/poststate.log"
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/poststate.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/poststate.ended"
+          exit "$rc"
+
+      - name: Finalize C4 manifest
+        id: finalize
+        if: always()
+        shell: bash
+        timeout-minutes: 8
+        env:
+          EVENT_H_SHA: ${{ github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          RUNNER_NAME_VALUE: ${{ runner.name }}
+          RUNNER_ENVIRONMENT_VALUE: ${{ runner.environment }}
+          RUNNER_OS_VALUE: ${{ runner.os }}
+          RUNNER_ARCH_VALUE: ${{ runner.arch }}
+          INITIALIZE_OUTCOME: ${{ steps.initialize.outcome }}
+          CHECKOUT_H_OUTCOME: ${{ steps.checkout_h.outcome }}
+          HARNESS_GUARD_OUTCOME: ${{ steps.harness_guard.outcome }}
+          CHECKOUT_BASE_OUTCOME: ${{ steps.checkout_base.outcome }}
+          CHECKOUT_P2_OUTCOME: ${{ steps.checkout_p2.outcome }}
+          SOURCE_GUARD_OUTCOME: ${{ steps.source_guard.outcome }}
+          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
+          TOOLING_OUTCOME: ${{ steps.tooling.outcome }}
+          INSTALL_PAIR_OUTCOME: ${{ steps.install_pair.outcome }}
+          TEST_PAIR_OUTCOME: ${{ steps.test_pair.outcome }}
+          POSTSTATE_OUTCOME: ${{ steps.poststate.outcome }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/finalize.started"
+          set +e
+          python3 - 2>&1 <<'PY' | tee "$EVIDENCE_DIR/finalize.log"
+          import hashlib
+          import json
+          import os
+          import subprocess
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          harness = Path(os.environ["HARNESS_DIR"])
+          errors = []
+
+          def read(name, fallback=None):
+              path = evidence / name
+              if not path.is_file() or path.is_symlink():
+                  return fallback
+              return path.read_text(encoding="utf-8", errors="replace").strip()
+
+          def git(*args):
+              result = subprocess.run(["git", "-C", str(harness), *args], capture_output=True, text=True, check=False)
+              return result.stdout.strip() if result.returncode == 0 else None
+
+          outcomes = {name: os.environ.get(key, "skipped").upper() for name, key in {
+              "initialize": "INITIALIZE_OUTCOME", "checkoutHarness": "CHECKOUT_H_OUTCOME",
+              "harnessGuard": "HARNESS_GUARD_OUTCOME", "checkoutBase": "CHECKOUT_BASE_OUTCOME",
+              "checkoutP2": "CHECKOUT_P2_OUTCOME", "sourceGuard": "SOURCE_GUARD_OUTCOME",
+              "setupNode": "SETUP_NODE_OUTCOME", "tooling": "TOOLING_OUTCOME",
+              "installPair": "INSTALL_PAIR_OUTCOME", "testPair": "TEST_PAIR_OUTCOME",
+              "poststate": "POSTSTATE_OUTCOME",
+          }.items()}
+          attribution_path = evidence / "attribution.json"
+          if attribution_path.is_file() and not attribution_path.is_symlink():
+              try:
+                  attribution = json.loads(attribution_path.read_text(encoding="utf-8"))
+              except json.JSONDecodeError as exc:
+                  attribution = {"decision": "UNKNOWN", "complete": False}
+                  errors.append(f"malformed attribution.json: {exc}")
+          else:
+              attribution = {"decision": "UNKNOWN", "complete": False}
+              errors.append("missing regular attribution.json")
+          prerequisites = ["initialize", "checkoutHarness", "harnessGuard", "checkoutBase", "checkoutP2", "sourceGuard", "setupNode", "tooling", "installPair", "poststate"]
+          all_pass = attribution.get("decision") == "NO_DIFFERENTIAL_ALL_PASS" and attribution.get("complete") is True
+          green = all_pass and all(outcomes[name] == "SUCCESS" for name in prerequisites) and outcomes["testPair"] == "SUCCESS"
+          final = {
+              "status": "PASS" if green else "FAIL", "exit": 0 if green else 1,
+              "decision": attribution.get("decision", "UNKNOWN"), "complete": attribution.get("complete", False),
+              "heavyGreenClaim": False, "errors": errors,
+          }
+          (evidence / "finalstatus.json").write_text(json.dumps(final, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          workflow = harness / os.environ["WORKFLOW_PATH"]
+          h14_history = {
+              "role": "DECLARATIVE_HISTORY_ONLY_NOT_SOURCE_VERDICT",
+              "commit": os.environ["H14_COMMIT"], "runId": os.environ["H14_RUN_ID"],
+              "finalManifestSha256": os.environ["H14_FINAL_MANIFEST_SHA256"],
+              "rawSignals": [
+                  {
+                      "surface": "migration", "fullName": os.environ["H14_MIGRATION_TARGET"],
+                      "rawAppearance": os.environ["H14_RAW_APPEARANCE"],
+                      "formalStatus": os.environ["H14_FORMAL_STATUS"],
+                      "reporterCompletion": os.environ["H14_REPORTER_COMPLETION"],
+                      "formalFailClaim": False,
+                  },
+                  {
+                      "surface": "trustedProxy", "fullName": os.environ["H14_TRUSTED_TARGET"],
+                      "rawAppearance": os.environ["H14_RAW_APPEARANCE"],
+                      "formalStatus": os.environ["H14_FORMAL_STATUS"],
+                      "reporterCompletion": os.environ["H14_REPORTER_COMPLETION"],
+                      "formalFailClaim": False,
+                  },
+              ],
+          }
+          c3_history = {
+              "role": "DECLARATIVE_HISTORY_ONLY_NOT_SOURCE_VERDICT",
+              "commit": os.environ["C3_COMMIT"],
+              "runId": os.environ["C3_RUN_ID"],
+              "attempt": int(os.environ["C3_RUN_ATTEMPT"]),
+              "status": os.environ["C3_RUN_STATUS"],
+              "conclusion": os.environ["C3_RUN_CONCLUSION"],
+              "jobLogFingerprintSha256": os.environ["C3_JOB_LOG_FINGERPRINT_SHA256"],
+              "rawMapsDecision": os.environ["C3_RAW_MAPS_DECISION"],
+              "finalizer": {
+                  "status": os.environ["C3_FINALIZER_STATUS"],
+                  "complete": os.environ["C3_FINALIZER_COMPLETE"] == "true",
+              },
+              "formalStatus": os.environ["C3_FORMAL_STATUS"],
+              "sealFailure": os.environ["C3_SEAL_FAILURE"],
+              "artifacts": int(os.environ["C3_ARTIFACTS"]),
+              "formalPassClaim": os.environ["C3_FORMAL_PASS_CLAIM"] == "true",
+          }
+          history = {"h14": h14_history, "c3": c3_history}
+          manifest = {
+              "schema": "openclaw.gateway-r7-gateway-auth-attribution-c4-manifest.v1",
+              "repository": os.environ["EXPECTED_REPOSITORY"],
+              "harness": {
+                  "commit": os.environ["EVENT_H_SHA"], "tree": git("rev-parse", f"{os.environ['EVENT_H_SHA']}^{{tree}}"),
+                  "parent": os.environ["P2_SHA"], "workflowPath": os.environ["WORKFLOW_PATH"],
+                  "workflowBlobSha": git("rev-parse", f"{os.environ['EVENT_H_SHA']}:{os.environ['WORKFLOW_PATH']}"),
+                  "workflowContentSha256": hashlib.sha256(workflow.read_bytes()).hexdigest() if workflow.is_file() and not workflow.is_symlink() else None,
+              },
+              "source": {
+                  "base": {"commit": os.environ["BASE_SHA"], "tree": os.environ["BASE_TREE"]},
+                  "p2": {"commit": os.environ["P2_SHA"], "tree": os.environ["P2_TREE"]},
+                  "migrationTestBlob": os.environ["MIGRATION_TEST_BLOB_SHA"],
+                  "trustedProxyTestBlob": os.environ["TRUSTED_PROXY_TEST_BLOB_SHA"],
+                  "gatewayServerConfigBlob": os.environ["GATEWAY_SERVER_CONFIG_BLOB_SHA"],
+                  "runVitestBlob": os.environ["RUN_VITEST_BLOB_SHA"],
+                  "packageBlob": os.environ["PACKAGE_BLOB_SHA"], "lockBlob": os.environ["LOCK_BLOB_SHA"],
+              },
+              "execution": {
+                  "order": ["base:migration", "base:trustedProxy", "base:joint", "p2:migration", "p2:trustedProxy", "p2:joint"],
+                  "processesPerSource": 3, "frozenInstallsPerSource": 1,
+                  "watchdog": {"silenceMs": 300000, "heartbeatMs": 30000}, "perTestTimeoutMs": 120000,
+                  "config": {"fileParallelism": False, "intersectIncludeFile": True, "isolate": False},
+              },
+              "history": history, "outcomes": outcomes, "attribution": attribution, "final": final,
+              "run": {
+                  "id": os.environ["RUN_ID"], "attempt": int(os.environ["RUN_ATTEMPT"]),
+                  "event": os.environ["EVENT_NAME"], "ref": os.environ["EVENT_REF"],
+                  "startedAt": read("job.started"), "endedAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              },
+              "runner": {
+                  "name": os.environ["RUNNER_NAME_VALUE"], "environment": os.environ["RUNNER_ENVIRONMENT_VALUE"],
+                  "os": os.environ["RUNNER_OS_VALUE"], "arch": os.environ["RUNNER_ARCH_VALUE"],
+                  "imageOS": os.environ.get("ImageOS"), "imageVersion": os.environ.get("ImageVersion"),
+              },
+              "policy": {
+                  "attributionOnly": True, "heavyGreenClaim": False, "githubRerunAllowed": False,
+                  "futureCandidateAttemptsAllowedAfterIndependentAudit": 0, "thirdCandidateAllowed": False,
+                  "cacheMutationAllowed": False, "sourceMutationAllowed": False,
+              },
+          }
+          (evidence / "manifest.partial.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps(final, sort_keys=True))
+          PY
+          pipeline=("${PIPESTATUS[@]}")
+          rc="${pipeline[0]}"; if test "$rc" -eq 0; then rc="${pipeline[1]}"; fi
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/finalize.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/finalize.ended"
+          exit "$rc"
+
+      - name: Seal exact C4 evidence set
+        id: seal
+        if: always()
+        shell: bash
+        timeout-minutes: 8
+        env:
+          HARNESS_GUARD_ACTION_OUTCOME: ${{ steps.harness_guard.outcome }}
+          SOURCE_GUARD_ACTION_OUTCOME: ${{ steps.source_guard.outcome }}
+          POSTSTATE_ACTION_OUTCOME: ${{ steps.poststate.outcome }}
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/seal.started"
+          set +e
+          python3 - 2>&1 <<'PY' | tee "$EVIDENCE_DIR/seal.log"
+          import hashlib
+          import json
+          import os
+          import re
+          import sys
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          empty_sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          allowed_action_outcomes = {"SUCCESS", "FAILURE", "CANCELLED", "SKIPPED"}
+          silent_logs = {
+              "harness-guard.log": {
+                  "exit": "harness-guard.exit", "started": "harness-guard.started", "ended": "harness-guard.ended",
+                  "manifestOutcome": "harnessGuard", "actionOutcomeEnv": "HARNESS_GUARD_ACTION_OUTCOME",
+              },
+              "source-guard.log": {
+                  "exit": "source-guard.exit", "started": "source-guard.started", "ended": "source-guard.ended",
+                  "manifestOutcome": "sourceGuard", "actionOutcomeEnv": "SOURCE_GUARD_ACTION_OUTCOME",
+              },
+              "poststate.log": {
+                  "exit": "poststate.exit", "started": "poststate.started", "ended": "poststate.ended",
+                  "manifestOutcome": "poststate", "actionOutcomeEnv": "POSTSTATE_ACTION_OUTCOME",
+              },
+          }
+          expected = {
+              "job.started", "policy.txt", "initialize.started", "initialize.ended", "initialize.exit",
+              "harness-guard.started", "harness-guard.ended", "harness-guard.exit", "harness-guard.log",
+              "source-guard.started", "source-guard.ended", "source-guard.exit", "source-guard.log",
+              "tooling.started", "tooling.ended", "tooling.exit", "tooling.log", "node.version.txt", "pnpm.version.txt", "package-manager.txt",
+              "install-pair.started", "install-pair.ended", "install-pair.exit", "base-install.exit", "base-install.log", "p2-install.exit", "p2-install.log",
+              "test-pair.started", "test-pair.ended", "test-pair.exit", "validator.exit", "validator.log", "attribution.json",
+              "poststate.started", "poststate.ended", "poststate.exit", "poststate.log",
+              "finalize.started", "finalize.ended", "finalize.exit", "finalize.log", "finalstatus.json", "manifest.partial.json",
+              "seal.started",
+          }
+          run_stems = ["base-migration", "base-trusted-proxy", "base-joint", "p2-migration", "p2-trusted-proxy", "p2-joint"]
+          for stem in run_stems:
+              expected.update({f"{stem}.{suffix}" for suffix in ["started", "ended", "exit", "log", "time", "vitest.json", "command.txt"]})
+              for side in ["before", "after"]:
+                  resource = f"{stem}-{side}"
+                  expected.update({f"{resource}.{suffix}" for suffix in ["started", "ended", "exit", "resources.txt"]})
+          allowed_during_seal = expected | {"manifest.json", "seal.json", "seal.log", "seal.ended", "seal.exit"}
+          entries = list(evidence.iterdir()) if evidence.is_dir() else []
+          invalid = sorted(path.name for path in entries if path.is_symlink() or not path.is_file())
+          actual = {path.name for path in entries}
+          missing = sorted(expected - actual)
+          foreign = sorted(actual - allowed_during_seal)
+          errors = []
+          if invalid: errors.append(f"non-regular evidence: {invalid!r}")
+          if missing: errors.append(f"missing evidence: {missing!r}")
+          if foreign: errors.append(f"foreign evidence: {foreign!r}")
+          utc_values = {}
+          for name in sorted(expected & actual):
+              path = evidence / name
+              if path.is_symlink() or not path.is_file():
+                  continue
+              if path.stat().st_size == 0 and name not in silent_logs:
+                  errors.append(f"empty evidence: {name}")
+              if name.endswith((".started", ".ended")):
+                  raw = path.read_bytes()
+                  if len(raw) != 21 or re.fullmatch(rb"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\n", raw) is None:
+                      errors.append(f"malformed UTC evidence: {name}")
+                  else:
+                      try:
+                          utc_values[name] = datetime.strptime(raw[:-1].decode("ascii"), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                      except (UnicodeDecodeError, ValueError):
+                          errors.append(f"invalid UTC evidence: {name}")
+              if name.endswith(".exit"):
+                  if re.fullmatch(r"[0-9]+\n", path.read_text(encoding="utf-8")) is None:
+                      errors.append(f"malformed exit evidence: {name}")
+              if name.endswith(".json"):
+                  try: json.loads(path.read_text(encoding="utf-8"))
+                  except (OSError, json.JSONDecodeError): errors.append(f"malformed JSON evidence: {name}")
+          partial = evidence / "manifest.partial.json"
+          fallback_manifest = {"schema": "openclaw.gateway-r7-gateway-auth-attribution-c4-unsealed.v1", "final": {"status": "FAIL", "decision": "UNKNOWN"}}
+          manifest = fallback_manifest
+          if partial.is_file() and not partial.is_symlink():
+              try:
+                  candidate = json.loads(partial.read_text(encoding="utf-8"))
+                  if isinstance(candidate, dict):
+                      manifest = candidate
+                  else:
+                      errors.append("manifest.partial.json root is not an object")
+              except (OSError, json.JSONDecodeError) as exc:
+                  errors.append(f"malformed manifest.partial.json: {exc}")
+          expected_c3_history = {
+              "role": "DECLARATIVE_HISTORY_ONLY_NOT_SOURCE_VERDICT",
+              "commit": os.environ["C3_COMMIT"], "runId": os.environ["C3_RUN_ID"],
+              "attempt": int(os.environ["C3_RUN_ATTEMPT"]), "status": os.environ["C3_RUN_STATUS"],
+              "conclusion": os.environ["C3_RUN_CONCLUSION"],
+              "jobLogFingerprintSha256": os.environ["C3_JOB_LOG_FINGERPRINT_SHA256"],
+              "rawMapsDecision": os.environ["C3_RAW_MAPS_DECISION"],
+              "finalizer": {"status": os.environ["C3_FINALIZER_STATUS"], "complete": os.environ["C3_FINALIZER_COMPLETE"] == "true"},
+              "formalStatus": os.environ["C3_FORMAL_STATUS"], "sealFailure": os.environ["C3_SEAL_FAILURE"],
+              "artifacts": int(os.environ["C3_ARTIFACTS"]), "formalPassClaim": os.environ["C3_FORMAL_PASS_CLAIM"] == "true",
+          }
+          history = manifest.get("history")
+          if not isinstance(history, dict) or history.get("c3") != expected_c3_history:
+              errors.append("C3 declarative history mismatch or forbidden formal PASS/artifact claim")
+          manifest_outcomes = manifest.get("outcomes") if isinstance(manifest.get("outcomes"), dict) else {}
+          silent_policy_logs = {}
+          for log_name, binding in silent_logs.items():
+              action_outcome = os.environ.get(binding["actionOutcomeEnv"], "").upper()
+              manifest_outcome = manifest_outcomes.get(binding["manifestOutcome"])
+              if action_outcome not in allowed_action_outcomes:
+                  errors.append(f"invalid Actions outcome for {log_name}: {action_outcome!r}")
+              if manifest_outcome not in allowed_action_outcomes:
+                  errors.append(f"invalid manifest outcome for {log_name}: {manifest_outcome!r}")
+              if manifest_outcome != action_outcome:
+                  errors.append(f"Actions/manifest outcome mismatch for {log_name}")
+              path = evidence / log_name
+              is_empty = path.is_file() and not path.is_symlink() and path.stat().st_size == 0
+              if is_empty:
+                  if action_outcome != "SUCCESS" or manifest_outcome != "SUCCESS":
+                      errors.append(f"empty silent-success log lacks SUCCESS outcomes: {log_name}")
+                  exit_path = evidence / binding["exit"]
+                  if not exit_path.is_file() or exit_path.is_symlink() or exit_path.read_bytes() != b"0\n":
+                      errors.append(f"empty silent-success log lacks exact zero exit: {log_name}")
+                  started = utc_values.get(binding["started"])
+                  ended = utc_values.get(binding["ended"])
+                  if started is None or ended is None or started > ended:
+                      errors.append(f"empty silent-success log lacks valid UTC interval: {log_name}")
+              silent_policy_logs[log_name] = {
+                  "empty": is_empty, "exitFile": binding["exit"], "startedFile": binding["started"], "endedFile": binding["ended"],
+                  "manifestOutcomeKey": binding["manifestOutcome"], "manifestOutcome": manifest_outcome, "actionOutcome": action_outcome,
+              }
+          hash_names = sorted(name for name in actual if name not in {"manifest.partial.json", "manifest.json", "seal.json", "seal.log", "seal.ended", "seal.exit"})
+          hashes = {name: hashlib.sha256((evidence / name).read_bytes()).hexdigest() for name in hash_names if (evidence / name).is_file() and not (evidence / name).is_symlink()}
+          for log_name, detail in silent_policy_logs.items():
+              detail["sha256"] = hashes.get(log_name)
+              if detail["empty"] and detail["sha256"] != empty_sha256:
+                  errors.append(f"empty silent-success SHA-256 mismatch: {log_name}")
+          silent_policy = {"allowedEmptyFiles": sorted(silent_logs), "emptySha256": empty_sha256, "logs": silent_policy_logs}
+          manifest["filesSha256"] = hashes
+          manifest["silentSuccessLogPolicy"] = silent_policy
+          manifest["sealValidation"] = {"errors": errors, "missing": missing, "foreign": foreign, "invalid": invalid}
+          (evidence / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          seal = {"schema": "openclaw.gateway-r7-gateway-auth-attribution-c4-seal.v1", "manifestSha256": hashlib.sha256((evidence / "manifest.json").read_bytes()).hexdigest(), "sealedFiles": len(hashes), "selfExcluded": ["manifest.json", "seal.json", "seal.log", "seal.ended", "seal.exit"], "silentSuccessLogPolicy": silent_policy, "valid": not errors, "errors": errors}
+          (evidence / "seal.json").write_text(json.dumps(seal, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          partial.unlink(missing_ok=True)
+          print(json.dumps(seal, sort_keys=True))
+          sys.exit(0 if not errors else 1)
+          PY
+          pipeline=("${PIPESTATUS[@]}")
+          rc="${pipeline[0]}"; if test "$rc" -eq 0; then rc="${pipeline[1]}"; fi
+          set -e
+          printf '%s\n' "$rc" > "$EVIDENCE_DIR/seal.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/seal.ended"
+          exit "$rc"
+
+      - name: Verify final seal and exact upload set
+        id: verify_seal
+        if: always()
+        shell: bash
+        timeout-minutes: 5
+        env:
+          HARNESS_GUARD_ACTION_OUTCOME: ${{ steps.harness_guard.outcome }}
+          SOURCE_GUARD_ACTION_OUTCOME: ${{ steps.source_guard.outcome }}
+          POSTSTATE_ACTION_OUTCOME: ${{ steps.poststate.outcome }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import re
+          import shutil
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          evidence = Path(os.environ["EVIDENCE_DIR"])
+          upload = Path(os.environ["UPLOAD_DIR"])
+          empty_sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          allowed_action_outcomes = {"SUCCESS", "FAILURE", "CANCELLED", "SKIPPED"}
+          silent_logs = {
+              "harness-guard.log": {
+                  "exit": "harness-guard.exit", "started": "harness-guard.started", "ended": "harness-guard.ended",
+                  "manifestOutcome": "harnessGuard", "actionOutcomeEnv": "HARNESS_GUARD_ACTION_OUTCOME",
+              },
+              "source-guard.log": {
+                  "exit": "source-guard.exit", "started": "source-guard.started", "ended": "source-guard.ended",
+                  "manifestOutcome": "sourceGuard", "actionOutcomeEnv": "SOURCE_GUARD_ACTION_OUTCOME",
+              },
+              "poststate.log": {
+                  "exit": "poststate.exit", "started": "poststate.started", "ended": "poststate.ended",
+                  "manifestOutcome": "poststate", "actionOutcomeEnv": "POSTSTATE_ACTION_OUTCOME",
+              },
+          }
+          if not evidence.is_dir() or evidence.is_symlink():
+              raise SystemExit("evidence container is not a regular directory")
+          if upload.exists() or upload.is_symlink():
+              raise SystemExit("upload container must be absent before independent verification")
+
+          expected = {
+              "job.started", "policy.txt", "initialize.started", "initialize.ended", "initialize.exit",
+              "harness-guard.started", "harness-guard.ended", "harness-guard.exit", "harness-guard.log",
+              "source-guard.started", "source-guard.ended", "source-guard.exit", "source-guard.log",
+              "tooling.started", "tooling.ended", "tooling.exit", "tooling.log", "node.version.txt", "pnpm.version.txt", "package-manager.txt",
+              "install-pair.started", "install-pair.ended", "install-pair.exit", "base-install.exit", "base-install.log", "p2-install.exit", "p2-install.log",
+              "test-pair.started", "test-pair.ended", "test-pair.exit", "validator.exit", "validator.log", "attribution.json",
+              "poststate.started", "poststate.ended", "poststate.exit", "poststate.log",
+              "finalize.started", "finalize.ended", "finalize.exit", "finalize.log", "finalstatus.json",
+              "seal.started", "seal.log", "seal.ended", "seal.exit", "manifest.json", "seal.json",
+          }
+          run_stems = ["base-migration", "base-trusted-proxy", "base-joint", "p2-migration", "p2-trusted-proxy", "p2-joint"]
+          for stem in run_stems:
+              expected.update({f"{stem}.{suffix}" for suffix in ["started", "ended", "exit", "log", "time", "vitest.json", "command.txt"]})
+              for side in ["before", "after"]:
+                  resource = f"{stem}-{side}"
+                  expected.update({f"{resource}.{suffix}" for suffix in ["started", "ended", "exit", "resources.txt"]})
+          container = {"manifest.json", "seal.json", "seal.log", "seal.ended", "seal.exit"}
+          payload = expected - container
+
+          entries = sorted(evidence.iterdir(), key=lambda path: path.name)
+          invalid = [path.name for path in entries if path.is_symlink() or not path.is_file()]
+          actual = {path.name for path in entries}
+          if invalid:
+              raise SystemExit(f"symlink or non-regular evidence: {invalid!r}")
+          if actual != expected:
+              raise SystemExit(f"exact evidence set mismatch: missing={sorted(expected - actual)!r} extra={sorted(actual - expected)!r}")
+          if (evidence / "manifest.partial.json").exists():
+              raise SystemExit("partial manifest survived sealing")
+          utc_values = {}
+          for name in sorted(expected):
+              path = evidence / name
+              if path.stat().st_size == 0 and name not in silent_logs:
+                  raise SystemExit(f"empty evidence outside silent-success allowlist: {name}")
+              if name.endswith((".started", ".ended")):
+                  raw = path.read_bytes()
+                  if len(raw) != 21 or re.fullmatch(rb"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\n", raw) is None:
+                      raise SystemExit(f"malformed UTC evidence: {name}")
+                  try:
+                      utc_values[name] = datetime.strptime(raw[:-1].decode("ascii"), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+                  except (UnicodeDecodeError, ValueError):
+                      raise SystemExit(f"invalid UTC evidence: {name}")
+              if name.endswith(".exit") and re.fullmatch(rb"[0-9]+\n", path.read_bytes()) is None:
+                  raise SystemExit(f"malformed exit evidence: {name}")
+              if name.endswith(".json"):
+                  try:
+                      json.loads(path.read_text(encoding="utf-8"))
+                  except (OSError, json.JSONDecodeError) as exc:
+                      raise SystemExit(f"malformed JSON evidence: {name}: {exc}")
+
+          manifest_path = evidence / "manifest.json"
+          seal_path = evidence / "seal.json"
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+          sealed = json.loads(seal_path.read_text(encoding="utf-8"))
+          if not isinstance(manifest, dict) or not isinstance(sealed, dict):
+              raise SystemExit("manifest or seal root is not an object")
+          expected_c3_history = {
+              "role": "DECLARATIVE_HISTORY_ONLY_NOT_SOURCE_VERDICT",
+              "commit": os.environ["C3_COMMIT"], "runId": os.environ["C3_RUN_ID"],
+              "attempt": int(os.environ["C3_RUN_ATTEMPT"]), "status": os.environ["C3_RUN_STATUS"],
+              "conclusion": os.environ["C3_RUN_CONCLUSION"],
+              "jobLogFingerprintSha256": os.environ["C3_JOB_LOG_FINGERPRINT_SHA256"],
+              "rawMapsDecision": os.environ["C3_RAW_MAPS_DECISION"],
+              "finalizer": {"status": os.environ["C3_FINALIZER_STATUS"], "complete": os.environ["C3_FINALIZER_COMPLETE"] == "true"},
+              "formalStatus": os.environ["C3_FORMAL_STATUS"], "sealFailure": os.environ["C3_SEAL_FAILURE"],
+              "artifacts": int(os.environ["C3_ARTIFACTS"]), "formalPassClaim": os.environ["C3_FORMAL_PASS_CLAIM"] == "true",
+          }
+          history = manifest.get("history")
+          if not isinstance(history, dict) or history.get("c3") != expected_c3_history:
+              raise SystemExit("C3 declarative history mismatch or forbidden formal PASS/artifact claim")
+          manifest_outcomes = manifest.get("outcomes") if isinstance(manifest.get("outcomes"), dict) else {}
+          hashes = manifest.get("filesSha256")
+          if not isinstance(hashes, dict) or set(hashes) != payload:
+              raise SystemExit("manifest hash key set does not equal the exact payload set")
+          for name in sorted(payload):
+              value = hashes.get(name)
+              if not isinstance(value, str) or len(value) != 64:
+                  raise SystemExit(f"malformed manifest hash: {name}")
+              actual_hash = hashlib.sha256((evidence / name).read_bytes()).hexdigest()
+              if value != actual_hash:
+                  raise SystemExit(f"independent manifest hash mismatch: {name}")
+          silent_policy_logs = {}
+          for log_name, binding in silent_logs.items():
+              action_outcome = os.environ.get(binding["actionOutcomeEnv"], "").upper()
+              manifest_outcome = manifest_outcomes.get(binding["manifestOutcome"])
+              if action_outcome not in allowed_action_outcomes or manifest_outcome not in allowed_action_outcomes:
+                  raise SystemExit(f"invalid Actions or manifest outcome for {log_name}")
+              if manifest_outcome != action_outcome:
+                  raise SystemExit(f"Actions/manifest outcome mismatch for {log_name}")
+              path = evidence / log_name
+              is_empty = path.stat().st_size == 0
+              if is_empty:
+                  if action_outcome != "SUCCESS" or manifest_outcome != "SUCCESS":
+                      raise SystemExit(f"empty silent-success log lacks SUCCESS outcomes: {log_name}")
+                  if (evidence / binding["exit"]).read_bytes() != b"0\n":
+                      raise SystemExit(f"empty silent-success log lacks exact zero exit: {log_name}")
+                  started = utc_values.get(binding["started"])
+                  ended = utc_values.get(binding["ended"])
+                  if started is None or ended is None or started > ended:
+                      raise SystemExit(f"empty silent-success log lacks valid UTC interval: {log_name}")
+                  if hashes.get(log_name) != empty_sha256:
+                      raise SystemExit(f"empty silent-success SHA-256 mismatch: {log_name}")
+              silent_policy_logs[log_name] = {
+                  "empty": is_empty, "exitFile": binding["exit"], "startedFile": binding["started"], "endedFile": binding["ended"],
+                  "manifestOutcomeKey": binding["manifestOutcome"], "manifestOutcome": manifest_outcome, "actionOutcome": action_outcome,
+                  "sha256": hashes.get(log_name),
+              }
+          silent_policy = {"allowedEmptyFiles": sorted(silent_logs), "emptySha256": empty_sha256, "logs": silent_policy_logs}
+          if manifest.get("silentSuccessLogPolicy") != silent_policy:
+              raise SystemExit("manifest silent-success policy mismatch")
+          if sealed.get("silentSuccessLogPolicy") != silent_policy:
+              raise SystemExit("seal silent-success policy mismatch")
+          validation = manifest.get("sealValidation")
+          if not isinstance(validation, dict) or any(validation.get(key) for key in ["errors", "missing", "foreign", "invalid"]):
+              raise SystemExit("manifest seal validation is not clean")
+          if sealed.get("manifestSha256") != hashlib.sha256(manifest_path.read_bytes()).hexdigest():
+              raise SystemExit("manifest seal mismatch")
+          if sealed.get("sealedFiles") != len(payload):
+              raise SystemExit("sealed file count mismatch")
+          if set(sealed.get("selfExcluded", [])) != container:
+              raise SystemExit("separate container contract mismatch")
+          if sealed.get("valid") is not True:
+              raise SystemExit("evidence seal is fail-closed")
+
+          upload.mkdir()
+          for name in sorted(expected):
+              shutil.copyfile(evidence / name, upload / name, follow_symlinks=False)
+          uploaded = sorted(upload.iterdir(), key=lambda path: path.name)
+          if not upload.is_dir() or upload.is_symlink():
+              raise SystemExit("upload container is not a regular directory")
+          if {path.name for path in uploaded} != expected:
+              raise SystemExit("actual upload set is not exact")
+          if any(path.is_symlink() or not path.is_file() for path in uploaded):
+              raise SystemExit("actual upload set contains symlink or non-regular entry")
+          for path in uploaded:
+              source_hash = hashlib.sha256((evidence / path.name).read_bytes()).hexdigest()
+              if hashlib.sha256(path.read_bytes()).hexdigest() != source_hash:
+                  raise SystemExit(f"upload container copy mismatch: {path.name}")
+              if path.stat().st_size == 0 and path.name not in silent_logs:
+                  raise SystemExit(f"upload contains forbidden empty evidence: {path.name}")
+              if path.name in silent_logs and path.stat().st_size == 0 and hashlib.sha256(path.read_bytes()).hexdigest() != empty_sha256:
+                  raise SystemExit(f"upload empty SHA-256 mismatch: {path.name}")
+          print(json.dumps({"payloadFiles": len(payload), "containerFiles": len(container), "uploadFiles": len(expected), "silentSuccessLogs": silent_policy_logs}, sort_keys=True))
+          PY
+
+      - name: Upload exact C4 evidence
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: r7-gateway-auth-attribution-c4-435e341a-7492177a-${{ github.run_id }}-attempt-1
+          path: |
+            ${{ runner.temp }}/r7-gateway-auth-attribution-c4-upload
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 90
+          overwrite: false
