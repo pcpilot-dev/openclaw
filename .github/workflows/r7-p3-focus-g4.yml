@@ -1,0 +1,1604 @@
+name: Gateway r7 P3 Focus G4 · DIAGNOSTIC EVIDENCE
+run-name: Gateway r7 P3 Focus G4 · run ${{ github.run_id }} attempt ${{ github.run_attempt }}
+
+on:
+  push:
+    branches:
+      - codex/evidence-gateway-r7-p3-focus-g4
+
+permissions:
+  contents: read
+
+concurrency:
+  group: r7-p3-focus-g4
+  cancel-in-progress: false
+
+env:
+  P2_SHA: 7492177a7068ca7481dd355f37b2d7a21630e9bc
+  P3_SHA: d03e45f8ca5faecfe7f2a065bc4d931d0b9c33de
+  P3_TREE: 68a5751d86c7b08ac90b8001bf02d3b07fa292cd
+  EXPECTED_REPOSITORY: pcpilot-dev/openclaw
+  EXPECTED_REF: refs/heads/codex/evidence-gateway-r7-p3-focus-g4
+  WORKFLOW_PATH: .github/workflows/r7-p3-focus-g4.yml
+  EXPECTED_H_PARENT: d03e45f8ca5faecfe7f2a065bc4d931d0b9c33de
+  EXPECTED_H_MESSAGE: "ci: preserve gateway r7 p3 not-run evidence"
+  EXPECTED_H_ADDITIONS: "1604"
+  P2_P3_FULL_INDEX_SHA256: b9215801640bcb3c4f155da797bd8f806e92c3281e4ca9befdeee1f9b7a3bac9
+  PACKAGE_BLOB_SHA: f63ea7030f84032ec3021b3459084655dd584e9a
+  LOCK_BLOB_SHA: e9940a0c1404b1b6c584701351a93282f12bab77
+  CONFIG_BLOB_SHA: eccaf8dc0b217df47fd79a117fe5928692b4fd31
+  RUN_VITEST_BLOB_SHA: 4f8b6d1abd0c94016f6c5f56f05ce219e8d9dfaa
+  TARGET_TEST_BLOB_SHA: 3cf1aba976f3dfb53c3cd2671fec655870c98e82
+  TIMEOUTS_BLOB_SHA: 5816139df0ac52117d330775267298a08082017a
+  EXPECTED_PACKAGE_MANAGER: pnpm@11.15.1+sha512.81350b07e53c9538a02f1f2303b4290fa2d7be04e56e2a970c4cc4b417dc761de196edabd49d55c7dc9580db81007c44143e4e3d7e462b3000d23c255122d065
+  EXPECTED_PNPM_VERSION: 11.15.1
+  EXPECTED_NODE_VERSION: 24.15.0
+  TARGET_CONFIG: test/vitest/vitest.extension-providers.config.ts
+  TARGET_FILE: extensions/anthropic/session-catalog.test.ts
+  TARGET_ASSERTION: Claude session catalog invalidates the assembled scan when an existing transcript is appended
+  NOT_RUN_RECEIPT_MANIFEST_SHA256: 09d3030f12c719f6f9e1dbf4fee0c56152fdfbcfe3ef0e696cfe35dfa6b6ada2
+  CI: "true"
+
+jobs:
+  focus:
+    name: P3 Focus G4 · exact session-catalog target
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    permissions:
+      contents: read
+
+    steps:
+      - name: Initialize evidence, runner identity, and absent store
+        id: initialize
+        env:
+          EVIDENCE_DIR_INIT: ${{ runner.temp }}/r7-p3-focus-g4-evidence
+          PNPM_STORE_DIR_INIT: ${{ runner.temp }}/r7-p3-focus-g4-store
+          RUNNER_ENVIRONMENT_INIT: ${{ runner.environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$EVIDENCE_DIR_INIT" = "$RUNNER_TEMP/r7-p3-focus-g4-evidence"
+          test "$PNPM_STORE_DIR_INIT" = "$RUNNER_TEMP/r7-p3-focus-g4-store"
+          test ! -e "$EVIDENCE_DIR_INIT"
+          test ! -e "$PNPM_STORE_DIR_INIT"
+          mkdir -p "$EVIDENCE_DIR_INIT"
+          printf 'EVIDENCE_DIR=%s\n' "$EVIDENCE_DIR_INIT" >> "$GITHUB_ENV"
+          printf 'PNPM_STORE_DIR=%s\n' "$PNPM_STORE_DIR_INIT" >> "$GITHUB_ENV"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR_INIT/job.started"
+          printf '%s\n' "$GITHUB_RUN_ID" > "$EVIDENCE_DIR_INIT/run.id"
+          printf '%s\n' "$GITHUB_RUN_ATTEMPT" > "$EVIDENCE_DIR_INIT/run.attempt"
+          printf '%s\n' "$GITHUB_SHA" > "$EVIDENCE_DIR_INIT/event.sha"
+          printf '%s\n' "$GITHUB_REF" > "$EVIDENCE_DIR_INIT/event.ref"
+          printf '%s\n' "$RUNNER_ENVIRONMENT_INIT" > "$EVIDENCE_DIR_INIT/runner.environment"
+          printf '%s\n' "$RUNNER_OS" > "$EVIDENCE_DIR_INIT/runner.os"
+          printf '%s\n' "$RUNNER_ARCH" > "$EVIDENCE_DIR_INIT/runner.arch"
+          printf '%s\n' "${ImageOS:-NOT_AVAILABLE}" > "$EVIDENCE_DIR_INIT/runner.image-os"
+          printf '%s\n' "${ImageVersion:-NOT_AVAILABLE}" > "$EVIDENCE_DIR_INIT/runner.image-version"
+          : > "$EVIDENCE_DIR_INIT/test.stdout.log"
+          : > "$EVIDENCE_DIR_INIT/test.stderr.log"
+          init_exit=0
+          test "$RUNNER_ENVIRONMENT_INIT" = "github-hosted" || init_exit=1
+          test "$RUNNER_OS" = "Linux" || init_exit=1
+          test "$RUNNER_ARCH" = "X64" || init_exit=1
+          test -n "${ImageOS:-}" || init_exit=1
+          test -n "${ImageVersion:-}" || init_exit=1
+          printf '%s\n' "$init_exit" > "$EVIDENCE_DIR_INIT/initialize.exit"
+          exit "$init_exit"
+
+      - name: Checkout credential-free event harness commit
+        id: checkout_h
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Guard exact event harness, runner, parent, and workflow-only scope
+        id: guard_h
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REPOSITORY: ${{ github.repository }}
+          EVENT_REF: ${{ github.ref }}
+          EVENT_ATTEMPT: ${{ github.run_attempt }}
+          EVENT_SHA: ${{ github.sha }}
+          EVENT_WORKFLOW_REF: ${{ github.workflow_ref }}
+          EVENT_WORKFLOW_SHA: ${{ github.workflow_sha }}
+          RUNNER_ENVIRONMENT_GUARD: ${{ runner.environment }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/harness-guard.started"
+          test "$EVENT_NAME" = "push"
+          test "$EVENT_REPOSITORY" = "$EXPECTED_REPOSITORY"
+          test "$EVENT_REF" = "$EXPECTED_REF"
+          test "$EVENT_ATTEMPT" = "1"
+          test "$EVENT_WORKFLOW_REF" = "$EXPECTED_REPOSITORY/$WORKFLOW_PATH@$EXPECTED_REF"
+          test "$EVENT_SHA" = "$EVENT_WORKFLOW_SHA"
+          test "$RUNNER_ENVIRONMENT_GUARD" = "github-hosted"
+          test "$RUNNER_ENVIRONMENT_GUARD" = "$(cat "$EVIDENCE_DIR/runner.environment")"
+          test "$RUNNER_OS" = "Linux"
+          test "$RUNNER_ARCH" = "X64"
+          test "$RUNNER_OS" = "$(cat "$EVIDENCE_DIR/runner.os")"
+          test "$RUNNER_ARCH" = "$(cat "$EVIDENCE_DIR/runner.arch")"
+          test "$ImageOS" = "$(cat "$EVIDENCE_DIR/runner.image-os")"
+          test "$ImageVersion" = "$(cat "$EVIDENCE_DIR/runner.image-version")"
+          test "$(git rev-parse HEAD)" = "$EVENT_SHA"
+          test "$(git rev-parse HEAD)" = "$EVENT_WORKFLOW_SHA"
+          test "$(git rev-list --parents -n 1 HEAD | awk '{print NF}')" = "2"
+          test "$(git rev-parse HEAD^)" = "$EXPECTED_H_PARENT"
+          test "$(git show -s --format=%s HEAD)" = "$EXPECTED_H_MESSAGE"
+          test "$(git diff-tree --no-commit-id --name-only -r HEAD | wc -l | tr -d ' ')" = "1"
+          test "$(git diff-tree --no-commit-id --name-status -r HEAD)" = $'A\t'"$WORKFLOW_PATH"
+          test "$(git diff --numstat "$EXPECTED_H_PARENT" HEAD -- "$WORKFLOW_PATH")" = "$EXPECTED_H_ADDITIONS"$'\t0\t'"$WORKFLOW_PATH"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          printf '%s\n' "$EVENT_SHA" > "$EVIDENCE_DIR/harness.head"
+          printf '%s\n' "$EXPECTED_H_PARENT" > "$EVIDENCE_DIR/harness.parent"
+          printf '%s\n' "$EXPECTED_H_MESSAGE" > "$EVIDENCE_DIR/harness.message"
+          printf '%s\t0\t%s\n' "$EXPECTED_H_ADDITIONS" "$WORKFLOW_PATH" > "$EVIDENCE_DIR/harness.numstat"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/harness-guard.ended"
+
+      - name: Checkout credential-free detached P3 candidate
+        id: checkout_candidate
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          ref: d03e45f8ca5faecfe7f2a065bc4d931d0b9c33de
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Guard exact detached P3 candidate and source contract
+        id: guard_candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/candidate-guard.started"
+          test "$(git rev-parse HEAD)" = "$P3_SHA"
+          test "$(git rev-parse HEAD^{tree})" = "$P3_TREE"
+          test "$(git rev-list --parents -n 1 HEAD | awk '{print NF}')" = "2"
+          test "$(git rev-parse HEAD^)" = "$P2_SHA"
+          test "$(git diff --name-only "$P2_SHA" "$P3_SHA")" = "$TARGET_FILE"
+          test "$(git diff --name-status "$P2_SHA" "$P3_SHA")" = $'M\t'"$TARGET_FILE"
+          test "$(git diff --numstat "$P2_SHA" "$P3_SHA")" = $'12\t7\t'"$TARGET_FILE"
+          test "$(git diff --no-ext-diff --no-textconv --full-index --binary "$P2_SHA" "$P3_SHA" | sha256sum | awk '{print $1}')" = "$P2_P3_FULL_INDEX_SHA256"
+          test "$(git hash-object package.json)" = "$PACKAGE_BLOB_SHA"
+          test "$(git hash-object pnpm-lock.yaml)" = "$LOCK_BLOB_SHA"
+          test "$(git hash-object "$TARGET_CONFIG")" = "$CONFIG_BLOB_SHA"
+          test "$(git hash-object scripts/run-vitest.mjs)" = "$RUN_VITEST_BLOB_SHA"
+          test "$(git hash-object "$TARGET_FILE")" = "$TARGET_TEST_BLOB_SHA"
+          test "$(git hash-object test/vitest/vitest.timeouts.ts)" = "$TIMEOUTS_BLOB_SHA"
+          test "$(node -p "require('./package.json').packageManager")" = "$EXPECTED_PACKAGE_MANAGER"
+          test "$(sed -n 's/^export const DEFAULT_VITEST_TEST_TIMEOUT_MS = \([0-9_]*\);$/\1/p' test/vitest/vitest.timeouts.ts | tr -d _ )" = "120000"
+          grep -Fx 'export const DEFAULT_VITEST_NO_OUTPUT_TIMEOUT_MS = 120_000;' scripts/run-vitest.mjs
+          grep -Fx 'export const DEFAULT_VITEST_NO_OUTPUT_HEARTBEAT_MS = 30_000;' scripts/run-vitest.mjs
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+          printf '%s\n' "$P3_SHA" > "$EVIDENCE_DIR/candidate.head"
+          printf '%s\n' "$P3_TREE" > "$EVIDENCE_DIR/candidate.tree"
+          printf '%s\n' "$P2_SHA" > "$EVIDENCE_DIR/candidate.parent"
+          printf '%s\n' "$P2_P3_FULL_INDEX_SHA256" > "$EVIDENCE_DIR/candidate.diff-full-index.sha256"
+          printf '12\t7\t%s\n' "$TARGET_FILE" > "$EVIDENCE_DIR/candidate.numstat"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/candidate-guard.ended"
+
+      - name: Set up exact Node 24.15.0
+        id: setup_node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24.15.0
+          check-latest: false
+
+      - name: Bind exact pnpm tooling and absent fresh store
+        id: tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/tooling.started"
+          test "$(node --version)" = "v$EXPECTED_NODE_VERSION"
+          test "$(node -p "require('./package.json').packageManager")" = "$EXPECTED_PACKAGE_MANAGER"
+          test ! -e "$PNPM_STORE_DIR"
+          test -x /usr/bin/time
+          corepack enable
+          corepack prepare "$EXPECTED_PACKAGE_MANAGER" --activate
+          test "$(pnpm --version)" = "$EXPECTED_PNPM_VERSION"
+          node --version > "$EVIDENCE_DIR/node.version"
+          pnpm --version > "$EVIDENCE_DIR/pnpm.version"
+          printf '%s\n' "$EXPECTED_PACKAGE_MANAGER" > "$EVIDENCE_DIR/package-manager.txt"
+          printf '%s\n' "$PNPM_STORE_DIR" > "$EVIDENCE_DIR/store.path"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/tooling.ended"
+
+      - name: Require at least 8 GiB before frozen install
+        id: preinstall_gate
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/preinstall.started"
+          available_kib="$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')"
+          test "$available_kib" -ge 8388608
+          {
+            printf 'available_kib=%s\n' "$available_kib"
+            printf 'nproc=%s\n' "$(nproc)"
+            printf '[df]\n'; df -Pk "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+            printf '[meminfo]\n'; cat /proc/meminfo
+            for pressure in cpu memory io; do printf '[psi:%s]\n' "$pressure"; cat "/proc/pressure/$pressure"; done
+          } > "$EVIDENCE_DIR/preinstall.resources"
+          test ! -e "$PNPM_STORE_DIR"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/preinstall.ended"
+
+      - name: Frozen install exactly once
+        id: frozen_install
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install.started"
+          test ! -e "$PNPM_STORE_DIR"
+          set +e
+          pnpm install --frozen-lockfile --store-dir "$PNPM_STORE_DIR" > "$EVIDENCE_DIR/install.stdout.log" 2> "$EVIDENCE_DIR/install.stderr.log"
+          install_exit=$?
+          set -e
+          printf '%s\n' "$install_exit" > "$EVIDENCE_DIR/install.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/install.ended"
+          exit "$install_exit"
+
+      - name: Require at least 4 GiB before exact focus run
+        id: prefocus_gate
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          set -euo pipefail
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/prefocus.started"
+          available_kib="$(df -Pk "$RUNNER_TEMP" | awk 'NR == 2 {print $4}')"
+          test "$available_kib" -ge 4194304
+          {
+            printf 'available_kib=%s\n' "$available_kib"
+            printf 'nproc=%s\n' "$(nproc)"
+            printf '[df]\n'; df -Pk "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+            printf '[meminfo]\n'; cat /proc/meminfo
+            for pressure in cpu memory io; do printf '[psi:%s]\n' "$pressure"; cat "/proc/pressure/$pressure"; done
+          } > "$EVIDENCE_DIR/prefocus.resources"
+          test -d "$PNPM_STORE_DIR"
+          test "$(git rev-parse HEAD)" = "$P3_SHA"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/prefocus.ended"
+
+      - name: Run exact P3 focus once
+        id: focus_run
+        timeout-minutes: 30
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_command="node scripts/run-vitest.mjs run --config $TARGET_CONFIG $TARGET_FILE --reporter=verbose --reporter=json --outputFile.json=$EVIDENCE_DIR/reporter.json"
+          printf '%s\n' "$expected_command" > "$EVIDENCE_DIR/command.txt"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/test.started"
+          set +e
+          /usr/bin/time -v -o "$EVIDENCE_DIR/gnu-time.txt" node scripts/run-vitest.mjs run \
+            --config "$TARGET_CONFIG" \
+            "$TARGET_FILE" \
+            --reporter=verbose \
+            --reporter=json \
+            --outputFile.json="$EVIDENCE_DIR/reporter.json" \
+            > "$EVIDENCE_DIR/test.stdout.log" 2> "$EVIDENCE_DIR/test.stderr.log"
+          test_exit=$?
+          set -e
+          printf '%s\n' "$test_exit" > "$EVIDENCE_DIR/test.exit"
+          printf '%s\n' "$test_exit" > "$EVIDENCE_DIR/time.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/test.ended"
+          exit "$test_exit"
+
+      - name: Capture exact P3 poststate and final resources
+        id: poststate
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/poststate.started"
+          git rev-parse HEAD > "$EVIDENCE_DIR/post.head" 2> "$EVIDENCE_DIR/post.head.error"; head_exit=$?
+          git rev-parse HEAD^{tree} > "$EVIDENCE_DIR/post.tree" 2> "$EVIDENCE_DIR/post.tree.error"; tree_exit=$?
+          git rev-parse HEAD^ > "$EVIDENCE_DIR/post.parent" 2> "$EVIDENCE_DIR/post.parent.error"; parent_exit=$?
+          git status --porcelain=v1 --untracked-files=no > "$EVIDENCE_DIR/post.status" 2> "$EVIDENCE_DIR/post.status.error"; status_exit=$?
+          {
+            printf 'nproc=%s\n' "$(nproc)"
+            printf '[df]\n'; df -Pk "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
+            printf '[meminfo]\n'; cat /proc/meminfo
+            for pressure in cpu memory io; do printf '[psi:%s]\n' "$pressure"; cat "/proc/pressure/$pressure"; done
+          } > "$EVIDENCE_DIR/post.resources" 2>&1
+          post_exit=0
+          test "$head_exit" -eq 0 || post_exit=1
+          test "$tree_exit" -eq 0 || post_exit=1
+          test "$parent_exit" -eq 0 || post_exit=1
+          test "$status_exit" -eq 0 || post_exit=1
+          test "$(cat "$EVIDENCE_DIR/post.head" 2>/dev/null)" = "$P3_SHA" || post_exit=1
+          test "$(cat "$EVIDENCE_DIR/post.tree" 2>/dev/null)" = "$P3_TREE" || post_exit=1
+          test "$(cat "$EVIDENCE_DIR/post.parent" 2>/dev/null)" = "$P2_SHA" || post_exit=1
+          test ! -s "$EVIDENCE_DIR/post.status" || post_exit=1
+          printf '%s\n' "$post_exit" > "$EVIDENCE_DIR/poststate.exit"
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/poststate.ended"
+          exit "$post_exit"
+
+      - name: Finalize fail-closed P3 focus evidence
+        id: finalize
+        if: always()
+        env:
+          INITIALIZE_OUTCOME: ${{ steps.initialize.outcome }}
+          CHECKOUT_H_OUTCOME: ${{ steps.checkout_h.outcome }}
+          GUARD_H_OUTCOME: ${{ steps.guard_h.outcome }}
+          CHECKOUT_CANDIDATE_OUTCOME: ${{ steps.checkout_candidate.outcome }}
+          GUARD_CANDIDATE_OUTCOME: ${{ steps.guard_candidate.outcome }}
+          SETUP_NODE_OUTCOME: ${{ steps.setup_node.outcome }}
+          TOOLING_OUTCOME: ${{ steps.tooling.outcome }}
+          PREINSTALL_OUTCOME: ${{ steps.preinstall_gate.outcome }}
+          INSTALL_OUTCOME: ${{ steps.frozen_install.outcome }}
+          PREFOCUS_OUTCOME: ${{ steps.prefocus_gate.outcome }}
+          FOCUS_OUTCOME: ${{ steps.focus_run.outcome }}
+          POSTSTATE_OUTCOME: ${{ steps.poststate.outcome }}
+          RUNNER_ENVIRONMENT_FINAL: ${{ runner.environment }}
+        shell: bash
+        run: |
+          set +e
+          date -u +%Y-%m-%dT%H:%M:%SZ > "$EVIDENCE_DIR/final.started"
+          python3 - <<'PY' > "$EVIDENCE_DIR/finalizer.log" 2>&1
+          import datetime
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+          import sys
+
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          envelope_errors = []
+          UTC_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\n$")
+
+
+          def read_text(name, required=True):
+              try:
+                  return (evidence / name).read_text(encoding="utf-8")
+              except (OSError, UnicodeDecodeError):
+                  if required:
+                      envelope_errors.append(f"missing or unreadable {name}")
+                  return None
+
+
+          def read_int(name, required=True):
+              text = read_text(name, required=required)
+              if text is None:
+                  return None
+              value = text.strip()
+              if not re.fullmatch(r"[0-9]+", value):
+                  envelope_errors.append(f"invalid integer {name}")
+                  return None
+              return int(value)
+
+
+          def strict_utc(name, required=True):
+              text = read_text(name, required=required)
+              if text is None:
+                  return None
+              if len(text.encode("ascii", errors="ignore")) != 21 or not UTC_RE.fullmatch(text):
+                  envelope_errors.append(f"invalid strict UTC marker {name}")
+                  return None
+              try:
+                  return datetime.datetime.strptime(text.strip(), "%Y-%m-%dT%H:%M:%SZ").replace(
+                      tzinfo=datetime.timezone.utc
+                  )
+              except ValueError:
+                  envelope_errors.append(f"invalid UTC calendar value {name}")
+                  return None
+
+
+          def nonnegative_int(value):
+              return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+          def normalized_file_matches(value, expected_file):
+              if not isinstance(value, str) or not value:
+                  return False
+              normalized = value.replace("\\", "/")
+              return normalized == expected_file or normalized.endswith("/" + expected_file)
+
+
+          def validate_report(report, expected_file, target_name):
+              errors = []
+              result = {
+                  "classification": "HARNESS_ERROR",
+                  "errors": errors,
+                  "file": None,
+                  "counts": {},
+                  "suiteCounts": {},
+                  "assertionStatusCardinality": {},
+                  "targetStatus": None,
+              }
+              if not isinstance(report, dict):
+                  errors.append("reporter root is missing or not an object")
+                  return result
+              test_results = report.get("testResults")
+              if not isinstance(test_results, list) or len(test_results) != 1:
+                  errors.append("reporter must contain exactly one testResults file")
+                  return result
+              file_result = test_results[0]
+              if not isinstance(file_result, dict):
+                  errors.append("reported file is not an object")
+                  return result
+              file_name = file_result.get("name")
+              file_status = file_result.get("status")
+              result["file"] = {"name": file_name, "status": file_status}
+              if not normalized_file_matches(file_name, expected_file):
+                  errors.append("reported file path differs from exact target")
+              if file_status not in {"passed", "failed"}:
+                  errors.append(f"unknown or non-terminal file status: {file_status!r}")
+              assertions = file_result.get("assertionResults")
+              if not isinstance(assertions, list) or not assertions:
+                  errors.append("assertionResults is missing or empty")
+                  assertions = []
+              status_cardinality = {"passed": 0, "failed": 0, "pending": 0, "todo": 0, "skipped": 0}
+              unknown_statuses = []
+              for assertion in assertions:
+                  if not isinstance(assertion, dict):
+                      unknown_statuses.append("NON_OBJECT")
+                      continue
+                  status = assertion.get("status")
+                  if status in status_cardinality:
+                      status_cardinality[status] += 1
+                  else:
+                      unknown_statuses.append(status)
+              result["assertionStatusCardinality"] = status_cardinality
+              if unknown_statuses:
+                  errors.append(f"unknown assertion statuses: {unknown_statuses!r}")
+              if status_cardinality["pending"] or status_cardinality["todo"] or status_cardinality["skipped"]:
+                  errors.append("pending, todo, or skipped assertions are forbidden")
+              test_keys = (
+                  "numTotalTests", "numPassedTests", "numFailedTests", "numPendingTests", "numTodoTests"
+              )
+              counts = {key: report.get(key) for key in test_keys}
+              result["counts"] = counts
+              if not all(nonnegative_int(value) for value in counts.values()):
+                  errors.append("reporter test counts must all be nonnegative integers")
+              else:
+                  if counts["numTotalTests"] <= 0:
+                      errors.append("reporter contains no tests")
+                  if counts["numTotalTests"] != (
+                      counts["numPassedTests"] + counts["numFailedTests"]
+                      + counts["numPendingTests"] + counts["numTodoTests"]
+                  ):
+                      errors.append("reporter test counts are incoherent")
+                  if counts["numPendingTests"] != 0 or counts["numTodoTests"] != 0:
+                      errors.append("reporter pending/todo test counts must be zero")
+                  if len(assertions) != counts["numTotalTests"]:
+                      errors.append("assertion cardinality differs from numTotalTests")
+                  if status_cardinality["passed"] != counts["numPassedTests"]:
+                      errors.append("passed assertion cardinality mismatch")
+                  if status_cardinality["failed"] != counts["numFailedTests"]:
+                      errors.append("failed assertion cardinality mismatch")
+              suite_keys = (
+                  "numTotalTestSuites", "numPassedTestSuites", "numFailedTestSuites", "numPendingTestSuites"
+              )
+              suites = {key: report.get(key) for key in suite_keys}
+              result["suiteCounts"] = suites
+              if not all(nonnegative_int(value) for value in suites.values()):
+                  errors.append("reporter suite counts must all be nonnegative integers")
+              else:
+                  if suites["numTotalTestSuites"] <= 0:
+                      errors.append("reporter contains no suites")
+                  if suites["numTotalTestSuites"] != (
+                      suites["numPassedTestSuites"] + suites["numFailedTestSuites"]
+                      + suites["numPendingTestSuites"]
+                  ):
+                      errors.append("reporter suite counts are incoherent")
+                  if suites["numPendingTestSuites"] != 0:
+                      errors.append("reporter pending suite count must be zero")
+              targets = [
+                  assertion for assertion in assertions
+                  if isinstance(assertion, dict) and assertion.get("fullName") == target_name
+              ]
+              if len(targets) != 1:
+                  errors.append("exact target assertion is missing or duplicated")
+              else:
+                  result["targetStatus"] = targets[0].get("status")
+                  if result["targetStatus"] not in {"passed", "failed"}:
+                      errors.append("exact target assertion has a non-terminal status")
+              if errors:
+                  return result
+              success = report.get("success")
+              pass_shape = (
+                  success is True
+                  and file_status == "passed"
+                  and counts["numFailedTests"] == 0
+                  and counts["numPassedTests"] == counts["numTotalTests"]
+                  and suites["numFailedTestSuites"] == 0
+                  and suites["numPassedTestSuites"] == suites["numTotalTestSuites"]
+                  and status_cardinality["failed"] == 0
+                  and result["targetStatus"] == "passed"
+              )
+              failure_shape = (
+                  success is False
+                  and file_status == "failed"
+                  and counts["numFailedTests"] > 0
+                  and suites["numFailedTestSuites"] > 0
+                  and status_cardinality["failed"] > 0
+              )
+              if pass_shape:
+                  result["classification"] = "PASS"
+              elif failure_shape:
+                  result["classification"] = "TEST_FAILURE"
+              else:
+                  errors.append("reporter success/status/count shape is incoherent")
+              return result
+
+
+          def validate_watchdog(stderr, label, test_exit):
+              errors = []
+              heartbeat_prefix = "[vitest] still running with no output for "
+              terminal_prefix = "[vitest] no output for "
+              force_prefix = "[vitest] process group still alive after "
+              heartbeats = [f"{heartbeat_prefix}{elapsed}ms ({label})." for elapsed in (30000, 60000, 90000)]
+              terminal = f"{terminal_prefix}120000ms; terminating stalled Vitest process group ({label})."
+              force = f"{force_prefix}5000ms; sending SIGKILL ({label})."
+              markers = []
+              for line in stderr.splitlines():
+                  if line in heartbeats or line in {terminal, force}:
+                      markers.append(line)
+                  elif line.startswith((heartbeat_prefix, terminal_prefix, force_prefix)):
+                      errors.append(f"malformed or unbound watchdog marker: {line!r}")
+              terminal_count = markers.count(terminal)
+              force_count = markers.count(force)
+              if terminal_count > 1 or force_count > 1:
+                  errors.append("duplicate watchdog terminal or force marker")
+              if terminal_count == 1:
+                  expected_suffix = heartbeats + [terminal]
+                  if test_exit == 137:
+                      expected_suffix += [force]
+                  if markers[-len(expected_suffix):] != expected_suffix:
+                      errors.append("watchdog terminal lacks exact 30/60/90 second marker suffix")
+                  if test_exit not in (137, 143):
+                      errors.append("watchdog terminal conflicts with process exit")
+              if test_exit == 143 and force_count != 0:
+                  errors.append("SIGTERM exit conflicts with force marker")
+              if test_exit == 137 and terminal_count == 1 and force_count != 1:
+                  errors.append("SIGKILL watchdog exit lacks force marker")
+              if force_count and (terminal_count != 1 or test_exit != 137):
+                  errors.append("force marker lacks exact terminal/SIGKILL binding")
+              return {
+                  "errors": errors,
+                  "terminalMarkerObserved": terminal_count == 1,
+                  "forceKillMarkerObserved": force_count == 1,
+                  "heartbeatsObserved": sum(markers.count(item) for item in heartbeats),
+                  "origin": "REPO_NATIVE_NO_OUTPUT_WATCHDOG" if terminal_count == 1 and not errors else "UNKNOWN",
+              }
+
+
+          def parse_gnu_time(text, test_exit, time_exit, expected_command):
+              errors = []
+              result = {
+                  "valid": False,
+                  "command": None,
+                  "userSeconds": None,
+                  "systemSeconds": None,
+                  "elapsedSeconds": None,
+                  "maxRssKiB": None,
+                  "exitStatus": None,
+                  "errors": errors,
+              }
+              if not isinstance(text, str) or not text.strip():
+                  errors.append("GNU-time evidence is missing, empty, or truncated")
+                  return result
+              specs = {
+                  "command": r"^\s*Command being timed:\s*(.+?)\s*$",
+                  "user": r"^\s*User time \(seconds\):\s*(\S+)\s*$",
+                  "system": r"^\s*System time \(seconds\):\s*(\S+)\s*$",
+                  "elapsed": r"^\s*Elapsed \(wall clock\) time \(h:mm:ss or m:ss\):\s*(\S+)\s*$",
+                  "rss": r"^\s*Maximum resident set size \(kbytes\):\s*(\S+)\s*$",
+                  "exit": r"^\s*Exit status:\s*(\S+)\s*$",
+              }
+              found = {}
+              for key, pattern in specs.items():
+                  matches = re.findall(pattern, text, re.MULTILINE)
+                  if len(matches) != 1:
+                      errors.append(f"GNU-time field {key} must occur exactly once")
+                  else:
+                      found[key] = matches[0]
+              if errors:
+                  return result
+              if found["command"] != f'"{expected_command.strip()}"':
+                  errors.append("GNU-time command differs from exact focus invocation")
+              decimal_re = re.compile(r"^[0-9]+(?:\.[0-9]+)?$")
+              for key, output_key in (("user", "userSeconds"), ("system", "systemSeconds")):
+                  if not decimal_re.fullmatch(found[key]):
+                      errors.append(f"GNU-time {key} value is nonnumeric")
+                  else:
+                      result[output_key] = float(found[key])
+              elapsed_match = re.fullmatch(r"(?:(?P<hours>[0-9]+):)?(?P<minutes>[0-9]+):(?P<seconds>[0-9]+(?:\.[0-9]+)?)", found["elapsed"])
+              if elapsed_match is None:
+                  errors.append("GNU-time elapsed wall clock is malformed")
+              else:
+                  hours = int(elapsed_match.group("hours") or 0)
+                  minutes = int(elapsed_match.group("minutes"))
+                  seconds = float(elapsed_match.group("seconds"))
+                  if seconds >= 60 or (elapsed_match.group("hours") is not None and minutes >= 60):
+                      errors.append("GNU-time elapsed wall clock is out of range")
+                  else:
+                      result["elapsedSeconds"] = hours * 3600 + minutes * 60 + seconds
+              if not re.fullmatch(r"[0-9]+", found["rss"]):
+                  errors.append("GNU-time MaxRSS is nonnumeric")
+              else:
+                  result["maxRssKiB"] = int(found["rss"])
+              if not re.fullmatch(r"[0-9]+", found["exit"]):
+                  errors.append("GNU-time exit status is nonnumeric")
+              else:
+                  result["exitStatus"] = int(found["exit"])
+              result["command"] = found["command"]
+              if result["exitStatus"] is not None and (
+                  result["exitStatus"] != test_exit or result["exitStatus"] != time_exit
+              ):
+                  errors.append("GNU-time exit status differs from test.exit or time.exit")
+              result["valid"] = not errors
+              return result
+
+
+          def canonical_payload_set(classification, evidence_phase, steps):
+              if classification not in {"PASS", "TEST_FAILURE", "UNKNOWN_INCOMPLETE", "NOT_RUN", "HARNESS_ERROR"}:
+                  raise ValueError("unknown evidence classification")
+              if evidence_phase not in {"COMPLETE", "INCOMPLETE", "NOT_RUN"} or not isinstance(steps, dict):
+                  raise ValueError("missing evidence phase or step outcomes")
+              base = {
+                  "event.ref", "event.sha", "initialize.exit", "job.started", "run.attempt", "run.id",
+                  "runner.arch", "runner.environment", "runner.image-os", "runner.image-version", "runner.os",
+                  "test.stderr.log", "test.stdout.log",
+              }
+              terminal = {
+                  "final.ended", "final.exit", "final.started", "finalizer.log", "finalstatus.json", "manifest.json",
+              }
+              harness = {
+                  "harness-guard.started", "harness-guard.ended", "harness.head", "harness.message",
+                  "harness.numstat", "harness.parent",
+              }
+              candidate = {
+                  "candidate-guard.started", "candidate-guard.ended", "candidate.diff-full-index.sha256",
+                  "candidate.head", "candidate.numstat", "candidate.parent", "candidate.tree",
+              }
+              tooling = {
+                  "tooling.started", "tooling.ended", "node.version", "pnpm.version",
+                  "package-manager.txt", "store.path",
+              }
+              preinstall = {"preinstall.started", "preinstall.ended", "preinstall.resources"}
+              install = {
+                  "install.started", "install.ended", "install.exit", "install.stderr.log", "install.stdout.log",
+              }
+              prefocus = {"prefocus.started", "prefocus.ended", "prefocus.resources"}
+              focus_partial = {"command.txt", "test.started"}
+              focus_complete = focus_partial | {
+                  "gnu-time.txt", "reporter.json", "test.ended", "test.exit", "time.exit",
+              }
+              poststate = {
+                  "poststate.started", "poststate.ended", "poststate.exit", "post.head", "post.head.error",
+                  "post.parent", "post.parent.error", "post.resources", "post.status", "post.status.error",
+                  "post.tree", "post.tree.error",
+              }
+              expected = set(base) | terminal
+              prerequisites = {
+                  "initialize", "checkoutHarness", "guardHarness", "checkoutCandidate", "guardCandidate",
+                  "setupNode", "tooling", "preinstallGate", "frozenInstall", "prefocusGate", "poststate",
+              }
+              if classification in {"PASS", "TEST_FAILURE", "UNKNOWN_INCOMPLETE"}:
+                  if any(steps.get(name) != "success" for name in prerequisites):
+                      raise ValueError("accepted disposition has non-success prerequisite")
+                  focus_expected = "success" if classification == "PASS" else "failure"
+                  if steps.get("focusRun") != focus_expected:
+                      raise ValueError("focus outcome contradicts disposition")
+                  expected |= harness | candidate | tooling | preinstall | install | prefocus | poststate
+                  expected |= focus_complete if classification != "UNKNOWN_INCOMPLETE" else focus_partial
+                  return expected
+
+              def apply(step, success_set, failure_set=None, same_on_failure=False):
+                  outcome = steps.get(step)
+                  if outcome == "success" or (outcome == "failure" and same_on_failure):
+                      expected.update(success_set)
+                  elif outcome == "failure":
+                      expected.update(failure_set or set())
+                  elif outcome != "skipped":
+                      raise ValueError(f"noncanonical step outcome for {step}: {outcome!r}")
+
+              apply("guardHarness", harness, {"harness-guard.started"})
+              apply("guardCandidate", candidate, {"candidate-guard.started"})
+              apply("tooling", tooling, {"tooling.started"})
+              apply("preinstallGate", preinstall, {"preinstall.started"})
+              apply("frozenInstall", install, same_on_failure=True)
+              apply("prefocusGate", prefocus, {"prefocus.started"})
+              apply("poststate", poststate, same_on_failure=True)
+              focus_outcome = steps.get("focusRun")
+              if classification == "NOT_RUN":
+                  if focus_outcome != "skipped" or evidence_phase != "NOT_RUN":
+                      raise ValueError("NOT_RUN disposition contradicts focus outcome")
+              elif focus_outcome in {"success", "failure"}:
+                  expected |= focus_complete if evidence_phase == "COMPLETE" else focus_partial
+              elif focus_outcome != "skipped":
+                  raise ValueError("HARNESS_ERROR has noncanonical focus outcome")
+              return expected
+
+
+          steps = {
+              "initialize": os.environ["INITIALIZE_OUTCOME"],
+              "checkoutHarness": os.environ["CHECKOUT_H_OUTCOME"],
+              "guardHarness": os.environ["GUARD_H_OUTCOME"],
+              "checkoutCandidate": os.environ["CHECKOUT_CANDIDATE_OUTCOME"],
+              "guardCandidate": os.environ["GUARD_CANDIDATE_OUTCOME"],
+              "setupNode": os.environ["SETUP_NODE_OUTCOME"],
+              "tooling": os.environ["TOOLING_OUTCOME"],
+              "preinstallGate": os.environ["PREINSTALL_OUTCOME"],
+              "frozenInstall": os.environ["INSTALL_OUTCOME"],
+              "prefocusGate": os.environ["PREFOCUS_OUTCOME"],
+              "focusRun": os.environ["FOCUS_OUTCOME"],
+              "poststate": os.environ["POSTSTATE_OUTCOME"],
+          }
+          prerequisite_names = (
+              "initialize", "checkoutHarness", "guardHarness", "checkoutCandidate", "guardCandidate",
+              "setupNode", "tooling", "preinstallGate", "frozenInstall", "prefocusGate"
+          )
+          prerequisites_ok = all(steps[name] == "success" for name in prerequisite_names)
+          poststate_ok = steps["poststate"] == "success" and read_int("poststate.exit", required=False) == 0
+          if steps["initialize"] == "success" and read_int("initialize.exit", required=False) != 0:
+              envelope_errors.append("initialize exit evidence differs from zero")
+          if steps["frozenInstall"] == "success" and read_int("install.exit", required=False) != 0:
+              envelope_errors.append("frozen install exit evidence differs from zero")
+          if steps["tooling"] == "success":
+              if (read_text("node.version", required=False) or "").strip() != f"v{os.environ['EXPECTED_NODE_VERSION']}":
+                  envelope_errors.append("sealed Node version differs from exact contract")
+              if (read_text("pnpm.version", required=False) or "").strip() != os.environ["EXPECTED_PNPM_VERSION"]:
+                  envelope_errors.append("sealed pnpm version differs from exact contract")
+              if (read_text("package-manager.txt", required=False) or "").strip() != os.environ["EXPECTED_PACKAGE_MANAGER"]:
+                  envelope_errors.append("sealed packageManager differs from exact contract")
+              if (read_text("store.path", required=False) or "").strip() != os.environ["PNPM_STORE_DIR"]:
+                  envelope_errors.append("sealed pnpm store path differs from exact contract")
+          for step_name, resource_name, minimum_kib in (
+              ("preinstallGate", "preinstall.resources", 8388608),
+              ("prefocusGate", "prefocus.resources", 4194304),
+          ):
+              if steps[step_name] == "success":
+                  resource_text = read_text(resource_name, required=False) or ""
+                  match = re.search(r"^available_kib=([0-9]+)$", resource_text, re.MULTILINE)
+                  if match is None or int(match.group(1)) < minimum_kib:
+                      envelope_errors.append(f"sealed {step_name} headroom evidence is missing or below contract")
+          runner = {
+              "environment": (read_text("runner.environment") or "").strip(),
+              "os": (read_text("runner.os") or "").strip(),
+              "arch": (read_text("runner.arch") or "").strip(),
+              "imageOS": (read_text("runner.image-os") or "").strip(),
+              "imageVersion": (read_text("runner.image-version") or "").strip(),
+          }
+          if runner["environment"] != "github-hosted" or os.environ["RUNNER_ENVIRONMENT_FINAL"] != "github-hosted":
+              envelope_errors.append("runner.environment differs from github-hosted")
+          if runner["os"] != "Linux" or runner["arch"] != "X64":
+              envelope_errors.append("runner identity differs from Linux/X64")
+          if runner["imageOS"] in {"", "NOT_AVAILABLE"} or runner["imageVersion"] in {"", "NOT_AVAILABLE"}:
+              envelope_errors.append("runner image identity is unavailable")
+          if runner["imageOS"] != os.environ.get("ImageOS") or runner["imageVersion"] != os.environ.get("ImageVersion"):
+              envelope_errors.append("runner image identity changed")
+          for marker in (
+              "job.started", "harness-guard.started", "harness-guard.ended",
+              "candidate-guard.started", "candidate-guard.ended", "tooling.started", "tooling.ended",
+              "preinstall.started", "preinstall.ended", "install.started", "install.ended",
+              "prefocus.started", "prefocus.ended", "poststate.started", "poststate.ended", "final.started"
+          ):
+              strict_utc(marker)
+          test_started = strict_utc("test.started", required=False)
+          test_ended = strict_utc("test.ended", required=False)
+          if test_started is not None and test_ended is not None and test_ended < test_started:
+              envelope_errors.append("test UTC interval is reversed")
+          test_exit = read_int("test.exit", required=False)
+          time_exit = read_int("time.exit", required=False)
+          stderr = read_text("test.stderr.log", required=False) or ""
+          bound_json = str(evidence / "reporter.json")
+          label = (
+              f"run --config {os.environ['TARGET_CONFIG']} {os.environ['TARGET_FILE']} "
+              f"--reporter=verbose --reporter=json --outputFile.json={bound_json}"
+          )
+          watchdog = validate_watchdog(stderr, label, test_exit)
+          try:
+              report = json.loads((evidence / "reporter.json").read_text(encoding="utf-8"))
+          except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+              report = None
+          report_validation = validate_report(report, os.environ["TARGET_FILE"], os.environ["TARGET_ASSERTION"])
+          expected_command = (
+              f"node scripts/run-vitest.mjs run --config {os.environ['TARGET_CONFIG']} "
+              f"{os.environ['TARGET_FILE']} --reporter=verbose --reporter=json "
+              f"--outputFile.json={bound_json}\n"
+          )
+          gnu_time_text = read_text("gnu-time.txt", required=False)
+          gnu_time_validation = parse_gnu_time(gnu_time_text, test_exit, time_exit, expected_command)
+          command_evidence = read_text("command.txt", required=False)
+          if test_started is not None and command_evidence != expected_command:
+              envelope_errors.append("command evidence differs from exact focus invocation")
+          incomplete = test_started is not None and (
+              test_ended is None or test_exit is None or test_exit in (137, 143) or watchdog["terminalMarkerObserved"]
+          )
+          classification = "HARNESS_ERROR"
+          if test_started is None:
+              classification = "NOT_RUN" if not prerequisites_ok and steps["focusRun"] == "skipped" else "HARNESS_ERROR"
+          elif incomplete:
+              if prerequisites_ok and poststate_ok and steps["focusRun"] == "failure" and not watchdog["errors"] and not envelope_errors:
+                  classification = "UNKNOWN_INCOMPLETE"
+              else:
+                  classification = "HARNESS_ERROR"
+          elif test_exit == 0:
+              completed_errors = (
+                  list(envelope_errors) + list(watchdog["errors"])
+                  + list(report_validation["errors"]) + list(gnu_time_validation["errors"])
+              )
+              classification = (
+                  "PASS" if prerequisites_ok and poststate_ok and steps["focusRun"] == "success"
+                  and report_validation["classification"] == "PASS" and not completed_errors
+                  else "HARNESS_ERROR"
+              )
+              envelope_errors = completed_errors
+          elif test_exit == 1:
+              completed_errors = (
+                  list(envelope_errors) + list(watchdog["errors"])
+                  + list(report_validation["errors"]) + list(gnu_time_validation["errors"])
+              )
+              classification = (
+                  "TEST_FAILURE" if prerequisites_ok and poststate_ok and steps["focusRun"] == "failure"
+                  and report_validation["classification"] == "TEST_FAILURE" and not completed_errors
+                  else "HARNESS_ERROR"
+              )
+              envelope_errors = completed_errors
+          else:
+              envelope_errors.extend(watchdog["errors"])
+              envelope_errors.extend(report_validation["errors"])
+          harness = {
+              "head": (read_text("harness.head", required=False) or "").strip(),
+              "parent": (read_text("harness.parent", required=False) or "").strip(),
+              "message": (read_text("harness.message", required=False) or "").strip(),
+              "numstat": (read_text("harness.numstat", required=False) or "").strip(),
+              "workflowPath": os.environ["WORKFLOW_PATH"],
+          }
+          candidate = {
+              "head": (read_text("candidate.head", required=False) or "").strip(),
+              "tree": (read_text("candidate.tree", required=False) or "").strip(),
+              "parent": (read_text("candidate.parent", required=False) or "").strip(),
+              "diffFullIndexSha256": (read_text("candidate.diff-full-index.sha256", required=False) or "").strip(),
+              "numstat": (read_text("candidate.numstat", required=False) or "").strip(),
+          }
+          expected_h_numstat = f"{os.environ['EXPECTED_H_ADDITIONS']}\t0\t{os.environ['WORKFLOW_PATH']}"
+          if steps["guardHarness"] == "success" and harness != {
+              "head": os.environ["GITHUB_SHA"], "parent": os.environ["EXPECTED_H_PARENT"],
+              "message": os.environ["EXPECTED_H_MESSAGE"], "numstat": expected_h_numstat,
+              "workflowPath": os.environ["WORKFLOW_PATH"],
+          }:
+              envelope_errors.append("sealed harness identity differs from exact contract")
+          if steps["guardCandidate"] == "success" and candidate != {
+              "head": os.environ["P3_SHA"], "tree": os.environ["P3_TREE"],
+              "parent": os.environ["P2_SHA"], "diffFullIndexSha256": os.environ["P2_P3_FULL_INDEX_SHA256"],
+              "numstat": f"12\t7\t{os.environ['TARGET_FILE']}",
+          }:
+              envelope_errors.append("sealed candidate identity differs from exact P3 contract")
+          if envelope_errors and classification in {"PASS", "TEST_FAILURE", "UNKNOWN_INCOMPLETE"}:
+              classification = "HARNESS_ERROR"
+          phase_complete = test_started is not None and test_ended is not None and test_exit is not None
+          evidence_phase = (
+              "COMPLETE" if phase_complete and test_exit in (0, 1)
+              else "INCOMPLETE" if test_started is not None
+              else "NOT_RUN"
+          )
+          if evidence_phase == "INCOMPLETE":
+              for transient_name in ("reporter.json", "gnu-time.txt", "test.exit", "time.exit", "test.ended"):
+                  (evidence / transient_name).unlink(missing_ok=True)
+          payload_names = canonical_payload_set(classification, evidence_phase, steps)
+          finalizer_owned = {
+              "final.ended", "final.exit", "finalizer.log", "finalstatus.json", "manifest.json",
+          }
+          validated_names = sorted(payload_names - finalizer_owned)
+          validated_entries = []
+          for name in validated_names:
+              path = evidence / name
+              if path.is_symlink() or not path.is_file():
+                  raise ValueError(f"validated raw evidence missing, symlinked, or nonregular: {name}")
+              validated_entries.append({
+                  "path": name,
+                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                  "bytes": path.stat().st_size,
+              })
+          receipt_history = {
+              "disposition": "NOT_RUN",
+              "manifestSha256": os.environ["NOT_RUN_RECEIPT_MANIFEST_SHA256"],
+              "declarativeRiskHistoryOnly": True,
+              "passInput": False,
+          }
+          manifest = {
+              "schema": "r7-p3-focus-g4-v1",
+              "selfReferenceFree": True,
+              "heavyClaim": False,
+              "buildClaim": False,
+              "harness": harness,
+              "candidate": candidate,
+              "runner": runner,
+              "focus": {
+                  "config": os.environ["TARGET_CONFIG"], "file": os.environ["TARGET_FILE"],
+                  "targetAssertion": os.environ["TARGET_ASSERTION"], "processInvocations": 1,
+                  "retryCount": 0, "watchdogSilenceCapMs": 120000, "watchdogHeartbeatMs": 30000,
+                  "perTestTimeoutMs": 120000,
+              },
+              "result": {
+                  "classification": classification, "testExit": test_exit, "timeExit": time_exit,
+                  "phaseComplete": phase_complete, "evidencePhase": evidence_phase,
+                  "reporter": report_validation,
+                  "gnuTime": gnu_time_validation, "watchdog": watchdog,
+              },
+              "steps": steps,
+              "validatedFiles": {
+                  "schema": "r7-p3-focus-g4-validated-files-v1",
+                  "selfReferenceFree": True,
+                  "files": validated_entries,
+              },
+              "errors": envelope_errors,
+              "immutableRiskHistory": {"notRunReceipt": receipt_history},
+          }
+          finalstatus = {
+              "schema": "r7-p3-focus-g4-finalstatus-v1",
+              "status": "PASS" if classification == "PASS" else "FAIL",
+              "classification": classification,
+              "heavyClaim": False,
+              "buildClaim": False,
+              "errors": envelope_errors,
+          }
+          (evidence / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          (evidence / "finalstatus.json").write_text(json.dumps(finalstatus, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          final_exit = 0 if classification == "PASS" else 1
+          (evidence / "final.exit").write_text(f"{final_exit}\n", encoding="ascii")
+          (evidence / "final.ended").write_text(
+              datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ\n"), encoding="ascii"
+          )
+          print(json.dumps(finalstatus, sort_keys=True))
+          sys.exit(final_exit)
+          PY
+          finalizer_exit=$?
+          if test ! -s "$EVIDENCE_DIR/manifest.json" || test ! -s "$EVIDENCE_DIR/finalstatus.json" || test ! -s "$EVIDENCE_DIR/final.exit" || test ! -s "$EVIDENCE_DIR/final.ended"; then
+            python3 - <<'PY' >> "$EVIDENCE_DIR/finalizer.log" 2>&1
+          import datetime
+          import json
+          import os
+          import pathlib
+
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          error = "unexpected finalizer exception or incomplete terminal envelope"
+          steps = {
+              "initialize": os.environ["INITIALIZE_OUTCOME"],
+              "checkoutHarness": os.environ["CHECKOUT_H_OUTCOME"],
+              "guardHarness": os.environ["GUARD_H_OUTCOME"],
+              "checkoutCandidate": os.environ["CHECKOUT_CANDIDATE_OUTCOME"],
+              "guardCandidate": os.environ["GUARD_CANDIDATE_OUTCOME"],
+              "setupNode": os.environ["SETUP_NODE_OUTCOME"],
+              "tooling": os.environ["TOOLING_OUTCOME"],
+              "preinstallGate": os.environ["PREINSTALL_OUTCOME"],
+              "frozenInstall": os.environ["INSTALL_OUTCOME"],
+              "prefocusGate": os.environ["PREFOCUS_OUTCOME"],
+              "focusRun": os.environ["FOCUS_OUTCOME"],
+              "poststate": os.environ["POSTSTATE_OUTCOME"],
+          }
+          manifest = {
+              "schema": "r7-p3-focus-g4-v1", "selfReferenceFree": True,
+              "heavyClaim": False, "buildClaim": False,
+              "result": {
+                  "classification": "HARNESS_ERROR", "phaseComplete": False,
+                  "evidencePhase": "NOT_RUN" if steps["focusRun"] == "skipped" else "INCOMPLETE",
+              },
+              "steps": steps, "errors": [error],
+              "immutableRiskHistory": {
+                  "notRunReceipt": {
+                      "disposition": "NOT_RUN",
+                      "manifestSha256": os.environ["NOT_RUN_RECEIPT_MANIFEST_SHA256"],
+                      "declarativeRiskHistoryOnly": True,
+                      "passInput": False,
+                  }
+              },
+          }
+          finalstatus = {
+              "schema": "r7-p3-focus-g4-finalstatus-v1", "status": "FAIL",
+              "classification": "HARNESS_ERROR", "heavyClaim": False, "buildClaim": False,
+              "errors": [error],
+          }
+          (evidence / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          (evidence / "finalstatus.json").write_text(json.dumps(finalstatus, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          (evidence / "final.exit").write_text("1\n", encoding="ascii")
+          (evidence / "final.ended").write_text(
+              datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ\n"), encoding="ascii"
+          )
+          print(json.dumps(finalstatus, sort_keys=True))
+          PY
+            finalizer_exit=1
+          fi
+          exit "$finalizer_exit"
+
+      - name: Bind validated bytes into independent preseal receipt
+        id: preseal
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+
+          root = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+
+
+          def expected_payload_set(manifest):
+              classification = manifest.get("result", {}).get("classification")
+              phase = manifest.get("result", {}).get("evidencePhase")
+              steps = manifest.get("steps")
+              if classification not in {"PASS", "TEST_FAILURE", "UNKNOWN_INCOMPLETE", "NOT_RUN", "HARNESS_ERROR"}:
+                  raise ValueError("unknown evidence classification")
+              if phase not in {"COMPLETE", "INCOMPLETE", "NOT_RUN"} or not isinstance(steps, dict):
+                  raise ValueError("missing evidence phase or step outcomes")
+              base = {
+                  "event.ref", "event.sha", "initialize.exit", "job.started", "run.attempt", "run.id",
+                  "runner.arch", "runner.environment", "runner.image-os", "runner.image-version", "runner.os",
+                  "test.stderr.log", "test.stdout.log",
+              }
+              terminal = {
+                  "final.ended", "final.exit", "final.started", "finalizer.log", "finalstatus.json", "manifest.json",
+              }
+              harness = {
+                  "harness-guard.started", "harness-guard.ended", "harness.head", "harness.message",
+                  "harness.numstat", "harness.parent",
+              }
+              candidate = {
+                  "candidate-guard.started", "candidate-guard.ended", "candidate.diff-full-index.sha256",
+                  "candidate.head", "candidate.numstat", "candidate.parent", "candidate.tree",
+              }
+              tooling = {
+                  "tooling.started", "tooling.ended", "node.version", "pnpm.version",
+                  "package-manager.txt", "store.path",
+              }
+              preinstall = {"preinstall.started", "preinstall.ended", "preinstall.resources"}
+              install = {
+                  "install.started", "install.ended", "install.exit", "install.stderr.log", "install.stdout.log",
+              }
+              prefocus = {"prefocus.started", "prefocus.ended", "prefocus.resources"}
+              partial = {"command.txt", "test.started"}
+              complete = partial | {"gnu-time.txt", "reporter.json", "test.ended", "test.exit", "time.exit"}
+              poststate = {
+                  "poststate.started", "poststate.ended", "poststate.exit", "post.head", "post.head.error",
+                  "post.parent", "post.parent.error", "post.resources", "post.status", "post.status.error",
+                  "post.tree", "post.tree.error",
+              }
+              expected = set(base) | terminal
+              prerequisites = {
+                  "initialize", "checkoutHarness", "guardHarness", "checkoutCandidate", "guardCandidate",
+                  "setupNode", "tooling", "preinstallGate", "frozenInstall", "prefocusGate", "poststate",
+              }
+              if classification in {"PASS", "TEST_FAILURE", "UNKNOWN_INCOMPLETE"}:
+                  if any(steps.get(name) != "success" for name in prerequisites):
+                      raise ValueError("accepted disposition has non-success prerequisite")
+                  focus_expected = "success" if classification == "PASS" else "failure"
+                  if steps.get("focusRun") != focus_expected:
+                      raise ValueError("focus outcome contradicts disposition")
+                  expected |= harness | candidate | tooling | preinstall | install | prefocus | poststate
+                  expected |= complete if classification != "UNKNOWN_INCOMPLETE" else partial
+                  return expected
+
+              def apply(step, success_set, failure_set=None, same_on_failure=False):
+                  outcome = steps.get(step)
+                  if outcome == "success" or (outcome == "failure" and same_on_failure):
+                      expected.update(success_set)
+                  elif outcome == "failure":
+                      expected.update(failure_set or set())
+                  elif outcome != "skipped":
+                      raise ValueError(f"noncanonical outcome for {step}: {outcome!r}")
+
+              apply("guardHarness", harness, {"harness-guard.started"})
+              apply("guardCandidate", candidate, {"candidate-guard.started"})
+              apply("tooling", tooling, {"tooling.started"})
+              apply("preinstallGate", preinstall, {"preinstall.started"})
+              apply("frozenInstall", install, same_on_failure=True)
+              apply("prefocusGate", prefocus, {"prefocus.started"})
+              apply("poststate", poststate, same_on_failure=True)
+              focus_outcome = steps.get("focusRun")
+              if classification == "NOT_RUN":
+                  if focus_outcome != "skipped" or phase != "NOT_RUN":
+                      raise ValueError("NOT_RUN disposition contradicts focus outcome")
+              elif focus_outcome in {"success", "failure"}:
+                  expected |= complete if phase == "COMPLETE" else partial
+              elif focus_outcome != "skipped":
+                  raise ValueError("HARNESS_ERROR has noncanonical focus outcome")
+              return expected
+
+
+          payload = expected_payload_set(manifest)
+          classification = manifest["result"]["classification"]
+          expected_counts = {"PASS": 68, "TEST_FAILURE": 68, "UNKNOWN_INCOMPLETE": 63}
+          if classification in expected_counts and len(payload) != expected_counts[classification]:
+              raise SystemExit("canonical payload count changed")
+          actual = set()
+          for path in root.rglob("*"):
+              relative = path.relative_to(root).as_posix()
+              if path.is_symlink() or not path.is_file():
+                  raise SystemExit(f"symlink or nonregular preseal payload: {relative}")
+              actual.add(relative)
+          if actual != payload:
+              raise SystemExit(f"preseal payload mismatch missing={sorted(payload - actual)!r} extra={sorted(actual - payload)!r}")
+
+          finalizer_owned = {"final.ended", "final.exit", "finalizer.log", "finalstatus.json", "manifest.json"}
+          expected_validated = sorted(payload - finalizer_owned)
+          binding = manifest.get("validatedFiles")
+          if not isinstance(binding, dict) or binding.get("schema") != "r7-p3-focus-g4-validated-files-v1":
+              raise SystemExit("missing finalizer validated-files binding")
+          if binding.get("selfReferenceFree") is not True or not isinstance(binding.get("files"), list):
+              raise SystemExit("invalid finalizer validated-files contract")
+          validated_paths = [entry.get("path") for entry in binding["files"] if isinstance(entry, dict)]
+          if validated_paths != expected_validated or len(validated_paths) != len(set(validated_paths)):
+              raise SystemExit("finalizer validated-files path set mismatch")
+          for entry in binding["files"]:
+              path = root / entry["path"]
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              if digest != entry.get("sha256") or path.stat().st_size != entry.get("bytes"):
+                  raise SystemExit(f"finalizer validated-file mismatch: {entry['path']}")
+
+          expected_harness = {
+              "head": os.environ["GITHUB_SHA"], "parent": os.environ["EXPECTED_H_PARENT"],
+              "message": os.environ["EXPECTED_H_MESSAGE"],
+              "numstat": f"{os.environ['EXPECTED_H_ADDITIONS']}\t0\t{os.environ['WORKFLOW_PATH']}",
+              "workflowPath": os.environ["WORKFLOW_PATH"],
+          }
+          expected_candidate = {
+              "head": os.environ["P3_SHA"], "tree": os.environ["P3_TREE"], "parent": os.environ["P2_SHA"],
+              "diffFullIndexSha256": os.environ["P2_P3_FULL_INDEX_SHA256"],
+              "numstat": f"12\t7\t{os.environ['TARGET_FILE']}",
+          }
+          steps = manifest["steps"]
+          if steps.get("guardHarness") == "success" and manifest.get("harness") != expected_harness:
+              raise SystemExit("manifest harness binding differs from exact contract")
+          if steps.get("guardCandidate") == "success" and manifest.get("candidate") != expected_candidate:
+              raise SystemExit("manifest candidate binding differs from exact contract")
+
+          entries = []
+          for relative in sorted(payload):
+              path = root / relative
+              entries.append({
+                  "path": relative,
+                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                  "bytes": path.stat().st_size,
+              })
+          preseal_files = root / "preseal.files"
+          preseal_files.write_text(
+              "".join(f"{entry['sha256']}  {entry['bytes']}  {entry['path']}\n" for entry in entries),
+              encoding="utf-8",
+          )
+          receipt = {
+              "schema": "r7-p3-focus-g4-preseal-v1", "selfReferenceFree": True,
+              "classification": classification, "payloadCount": len(entries), "payloadFiles": entries,
+              "finalizerValidatedFilesSha256": hashlib.sha256(
+                  json.dumps(binding, sort_keys=True, separators=(",", ":")).encode("utf-8")
+              ).hexdigest(),
+              "presealContainers": ["preseal.files", "preseal.json", "preseal.sha256"],
+          }
+          preseal_json = root / "preseal.json"
+          preseal_json.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          (root / "preseal.sha256").write_text(
+              f"{hashlib.sha256(preseal_files.read_bytes()).hexdigest()}  preseal.files\n"
+              f"{hashlib.sha256(preseal_json.read_bytes()).hexdigest()}  preseal.json\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Seal self-reference-free exact evidence set
+        id: seal
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+
+          root = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+
+
+          def canonical_precontainer_set(manifest):
+              classification = manifest.get("result", {}).get("classification")
+              evidence_phase = manifest.get("result", {}).get("evidencePhase")
+              steps = manifest.get("steps")
+              if classification not in {"PASS", "TEST_FAILURE", "UNKNOWN_INCOMPLETE", "NOT_RUN", "HARNESS_ERROR"}:
+                  raise ValueError("unknown evidence classification")
+              if evidence_phase not in {"COMPLETE", "INCOMPLETE", "NOT_RUN"} or not isinstance(steps, dict):
+                  raise ValueError("missing evidence phase or step outcomes")
+              base = {
+                  "event.ref", "event.sha", "initialize.exit", "job.started", "run.attempt", "run.id",
+                  "runner.arch", "runner.environment", "runner.image-os", "runner.image-version", "runner.os",
+                  "test.stderr.log", "test.stdout.log",
+              }
+              final = {
+                  "final.ended", "final.exit", "final.started", "finalizer.log", "finalstatus.json", "manifest.json",
+              }
+              harness_full = {
+                  "harness-guard.started", "harness-guard.ended", "harness.head", "harness.message",
+                  "harness.numstat", "harness.parent",
+              }
+              candidate_full = {
+                  "candidate-guard.started", "candidate-guard.ended", "candidate.diff-full-index.sha256",
+                  "candidate.head", "candidate.numstat", "candidate.parent", "candidate.tree",
+              }
+              tooling_full = {
+                  "tooling.started", "tooling.ended", "node.version", "pnpm.version",
+                  "package-manager.txt", "store.path",
+              }
+              preinstall_full = {"preinstall.started", "preinstall.ended", "preinstall.resources"}
+              install_full = {
+                  "install.started", "install.ended", "install.exit", "install.stderr.log", "install.stdout.log",
+              }
+              prefocus_full = {"prefocus.started", "prefocus.ended", "prefocus.resources"}
+              focus_partial = {"command.txt", "test.started"}
+              focus_complete = focus_partial | {
+                  "gnu-time.txt", "reporter.json", "test.ended", "test.exit", "time.exit",
+              }
+              poststate_full = {
+                  "poststate.started", "poststate.ended", "poststate.exit", "post.head", "post.head.error",
+                  "post.parent", "post.parent.error", "post.resources", "post.status", "post.status.error",
+                  "post.tree", "post.tree.error",
+              }
+              expected = set(base) | final
+
+              def add_phase(step, success_files, failure_files, both_files=None):
+                  outcome = steps.get(step)
+                  if outcome == "success":
+                      expected.update(success_files)
+                  elif outcome == "failure":
+                      expected.update(both_files if both_files is not None else failure_files)
+                  elif outcome != "skipped":
+                      raise ValueError(f"unsupported step outcome for {step}: {outcome!r}")
+
+              complete_prerequisites = {
+                  "initialize", "checkoutHarness", "guardHarness", "checkoutCandidate", "guardCandidate",
+                  "setupNode", "tooling", "preinstallGate", "frozenInstall", "prefocusGate", "poststate",
+              }
+              if classification in {"PASS", "TEST_FAILURE", "UNKNOWN_INCOMPLETE"}:
+                  if any(steps.get(name) != "success" for name in complete_prerequisites):
+                      raise ValueError("complete/unknown disposition has non-success prerequisite")
+                  expected |= harness_full | candidate_full | tooling_full | preinstall_full | install_full | prefocus_full | poststate_full
+                  required_focus_outcome = "success" if classification == "PASS" else "failure"
+                  if steps.get("focusRun") != required_focus_outcome:
+                      raise ValueError("focus outcome contradicts disposition")
+                  expected |= focus_complete if classification in {"PASS", "TEST_FAILURE"} else focus_partial
+                  return expected
+
+              add_phase("guardHarness", harness_full, {"harness-guard.started"})
+              add_phase("guardCandidate", candidate_full, {"candidate-guard.started"})
+              add_phase("tooling", tooling_full, {"tooling.started"})
+              add_phase("preinstallGate", preinstall_full, {"preinstall.started"})
+              add_phase("frozenInstall", install_full, set(), both_files=install_full)
+              add_phase("prefocusGate", prefocus_full, {"prefocus.started"})
+              add_phase("poststate", poststate_full, set(), both_files=poststate_full)
+              focus_outcome = steps.get("focusRun")
+              if classification == "NOT_RUN":
+                  if focus_outcome != "skipped" or evidence_phase != "NOT_RUN":
+                      raise ValueError("NOT_RUN disposition contradicts focus outcome")
+              elif focus_outcome in {"success", "failure"}:
+                  expected |= focus_complete if evidence_phase == "COMPLETE" else focus_partial
+              elif focus_outcome != "skipped":
+                  raise ValueError(f"unsupported focus outcome: {focus_outcome!r}")
+              return expected
+
+
+          payload = canonical_precontainer_set(manifest)
+          preseal_containers = {"preseal.files", "preseal.json", "preseal.sha256"}
+          expected = payload | preseal_containers
+          actual = set()
+          for path in root.rglob("*"):
+              relative = path.relative_to(root).as_posix()
+              if path.is_symlink() or not path.is_file():
+                  raise SystemExit(f"symlink or nonregular entry in pre-container evidence: {relative}")
+              actual.add(relative)
+          missing = sorted(expected - actual)
+          extra = sorted(actual - expected)
+          if missing or extra:
+              raise SystemExit(f"pre-container evidence set mismatch missing={missing!r} extra={extra!r}")
+
+          receipt = json.loads((root / "preseal.json").read_text(encoding="utf-8"))
+          if receipt.get("schema") != "r7-p3-focus-g4-preseal-v1" or receipt.get("selfReferenceFree") is not True:
+              raise SystemExit("invalid preseal receipt")
+          if receipt.get("presealContainers") != ["preseal.files", "preseal.json", "preseal.sha256"]:
+              raise SystemExit("preseal container declaration mismatch")
+          receipt_entries = receipt.get("payloadFiles")
+          if not isinstance(receipt_entries, list) or receipt.get("payloadCount") != len(payload):
+              raise SystemExit("preseal payload count mismatch")
+          receipt_paths = [entry.get("path") for entry in receipt_entries if isinstance(entry, dict)]
+          if receipt_paths != sorted(payload) or len(receipt_paths) != len(set(receipt_paths)):
+              raise SystemExit("preseal payload paths differ from canonical payload")
+          preseal_lines = []
+          for entry in receipt_entries:
+              path = root / entry["path"]
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              if digest != entry.get("sha256") or path.stat().st_size != entry.get("bytes"):
+                  raise SystemExit(f"current payload differs from preseal binding: {entry['path']}")
+              preseal_lines.append(f"{digest}  {entry['bytes']}  {entry['path']}\n")
+          if (root / "preseal.files").read_text(encoding="utf-8") != "".join(preseal_lines):
+              raise SystemExit("preseal.files differs from receipt/current payload")
+          expected_preseal_hashes = (
+              f"{hashlib.sha256((root / 'preseal.files').read_bytes()).hexdigest()}  preseal.files\n"
+              f"{hashlib.sha256((root / 'preseal.json').read_bytes()).hexdigest()}  preseal.json\n"
+          )
+          if (root / "preseal.sha256").read_text(encoding="utf-8") != expected_preseal_hashes:
+              raise SystemExit("preseal container hash mismatch")
+          entries = [
+              {
+                  "path": relative,
+                  "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                  "bytes": path.stat().st_size,
+              }
+              for relative in sorted(expected)
+              for path in [root / relative]
+          ]
+          seal_files = root / "seal.files"
+          seal_files.write_text(
+              "".join(f"{entry['sha256']}  {entry['path']}\n" for entry in entries), encoding="utf-8"
+          )
+          artifact_files = sorted(expected | {"seal.files", "seal.json", "seal.sha256"})
+          seal = {
+              "schema": "r7-p3-focus-g4-seal-v1",
+              "selfReferenceFree": True,
+              "sealedFiles": entries,
+              "sealFilesSha256": hashlib.sha256(seal_files.read_bytes()).hexdigest(),
+              "artifactFiles": artifact_files,
+          }
+          seal_json = root / "seal.json"
+          seal_json.write_text(json.dumps(seal, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          (root / "seal.sha256").write_text(
+              f"{hashlib.sha256(seal_files.read_bytes()).hexdigest()}  seal.files\n"
+              f"{hashlib.sha256(seal_json.read_bytes()).hexdigest()}  seal.json\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Independently verify exact sealed upload set
+        id: verify_seal
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import datetime
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import re
+
+          root = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+
+
+          def reconstruct_precontainer_set(manifest):
+              result = manifest.get("result", {})
+              classification = result.get("classification")
+              evidence_phase = result.get("evidencePhase")
+              steps = manifest.get("steps")
+              allowed = {"PASS", "TEST_FAILURE", "UNKNOWN_INCOMPLETE", "NOT_RUN", "HARNESS_ERROR"}
+              if classification not in allowed or evidence_phase not in {"COMPLETE", "INCOMPLETE", "NOT_RUN"}:
+                  raise ValueError("manifest disposition is not canonical")
+              if not isinstance(steps, dict):
+                  raise ValueError("manifest step outcomes are absent")
+              expected = {
+                  "event.ref", "event.sha", "initialize.exit", "job.started", "run.attempt", "run.id",
+                  "runner.arch", "runner.environment", "runner.image-os", "runner.image-version", "runner.os",
+                  "test.stderr.log", "test.stdout.log", "final.ended", "final.exit", "final.started",
+                  "finalizer.log", "finalstatus.json", "manifest.json",
+              }
+              h = {
+                  "harness-guard.started", "harness-guard.ended", "harness.head", "harness.message",
+                  "harness.numstat", "harness.parent",
+              }
+              candidate = {
+                  "candidate-guard.started", "candidate-guard.ended", "candidate.diff-full-index.sha256",
+                  "candidate.head", "candidate.numstat", "candidate.parent", "candidate.tree",
+              }
+              tooling = {
+                  "tooling.started", "tooling.ended", "node.version", "pnpm.version",
+                  "package-manager.txt", "store.path",
+              }
+              preinstall = {"preinstall.started", "preinstall.ended", "preinstall.resources"}
+              install = {
+                  "install.started", "install.ended", "install.exit", "install.stderr.log", "install.stdout.log",
+              }
+              prefocus = {"prefocus.started", "prefocus.ended", "prefocus.resources"}
+              focus_partial = {"command.txt", "test.started"}
+              focus_complete = focus_partial | {
+                  "gnu-time.txt", "reporter.json", "test.ended", "test.exit", "time.exit",
+              }
+              post = {
+                  "poststate.started", "poststate.ended", "poststate.exit", "post.head", "post.head.error",
+                  "post.parent", "post.parent.error", "post.resources", "post.status", "post.status.error",
+                  "post.tree", "post.tree.error",
+              }
+              prerequisites = {
+                  "initialize", "checkoutHarness", "guardHarness", "checkoutCandidate", "guardCandidate",
+                  "setupNode", "tooling", "preinstallGate", "frozenInstall", "prefocusGate", "poststate",
+              }
+              if classification in {"PASS", "TEST_FAILURE", "UNKNOWN_INCOMPLETE"}:
+                  if any(steps.get(name) != "success" for name in prerequisites):
+                      raise ValueError("manifest prerequisite outcomes contradict disposition")
+                  focus_expected = "success" if classification == "PASS" else "failure"
+                  if steps.get("focusRun") != focus_expected:
+                      raise ValueError("manifest focus outcome contradicts disposition")
+                  expected |= h | candidate | tooling | preinstall | install | prefocus | post
+                  expected |= focus_complete if classification != "UNKNOWN_INCOMPLETE" else focus_partial
+                  return expected
+
+              def apply(step, success_set, failure_set=None, same_on_failure=False):
+                  outcome = steps.get(step)
+                  if outcome == "success" or (outcome == "failure" and same_on_failure):
+                      expected.update(success_set)
+                  elif outcome == "failure":
+                      expected.update(failure_set or set())
+                  elif outcome != "skipped":
+                      raise ValueError(f"noncanonical outcome for {step}: {outcome!r}")
+
+              apply("guardHarness", h, {"harness-guard.started"})
+              apply("guardCandidate", candidate, {"candidate-guard.started"})
+              apply("tooling", tooling, {"tooling.started"})
+              apply("preinstallGate", preinstall, {"preinstall.started"})
+              apply("frozenInstall", install, same_on_failure=True)
+              apply("prefocusGate", prefocus, {"prefocus.started"})
+              apply("poststate", post, same_on_failure=True)
+              focus_outcome = steps.get("focusRun")
+              if classification == "NOT_RUN":
+                  if focus_outcome != "skipped" or evidence_phase != "NOT_RUN":
+                      raise ValueError("NOT_RUN phase contradicts focus outcome")
+              elif focus_outcome in {"success", "failure"}:
+                  expected |= focus_complete if evidence_phase == "COMPLETE" else focus_partial
+              elif focus_outcome != "skipped":
+                  raise ValueError("HARNESS_ERROR has noncanonical focus outcome")
+              return expected
+
+
+          payload = reconstruct_precontainer_set(manifest)
+          preseal_containers = {"preseal.files", "preseal.json", "preseal.sha256"}
+          expected_precontainer = payload | preseal_containers
+          expected_artifacts = sorted(expected_precontainer | {"seal.files", "seal.json", "seal.sha256"})
+          classification = manifest.get("result", {}).get("classification")
+          expected_counts = {"PASS": 68, "TEST_FAILURE": 68, "UNKNOWN_INCOMPLETE": 63}
+          if classification in expected_counts and len(payload) != expected_counts[classification]:
+              raise SystemExit("independent canonical payload count changed")
+
+          finalizer_owned = {"final.ended", "final.exit", "finalizer.log", "finalstatus.json", "manifest.json"}
+          expected_validated = sorted(payload - finalizer_owned)
+          binding = manifest.get("validatedFiles")
+          if not isinstance(binding, dict) or binding.get("schema") != "r7-p3-focus-g4-validated-files-v1":
+              raise SystemExit("invalid finalizer validated-files binding")
+          if binding.get("selfReferenceFree") is not True or not isinstance(binding.get("files"), list):
+              raise SystemExit("invalid finalizer validated-files shape")
+          validated_paths = [entry.get("path") for entry in binding["files"] if isinstance(entry, dict)]
+          if validated_paths != expected_validated or len(validated_paths) != len(set(validated_paths)):
+              raise SystemExit("independent validated-files path mismatch")
+          for entry in binding["files"]:
+              path = root / entry["path"]
+              if path.is_symlink() or not path.is_file():
+                  raise SystemExit(f"validated path missing or nonregular: {entry['path']}")
+              if hashlib.sha256(path.read_bytes()).hexdigest() != entry.get("sha256"):
+                  raise SystemExit(f"validated-file hash mismatch: {entry['path']}")
+              if path.stat().st_size != entry.get("bytes"):
+                  raise SystemExit(f"validated-file size mismatch: {entry['path']}")
+
+          preseal = json.loads((root / "preseal.json").read_text(encoding="utf-8"))
+          if preseal.get("schema") != "r7-p3-focus-g4-preseal-v1" or preseal.get("selfReferenceFree") is not True:
+              raise SystemExit("invalid independent preseal contract")
+          if preseal.get("presealContainers") != ["preseal.files", "preseal.json", "preseal.sha256"]:
+              raise SystemExit("independent preseal container declaration mismatch")
+          if preseal.get("classification") != classification or preseal.get("payloadCount") != len(payload):
+              raise SystemExit("preseal disposition/count mismatch")
+          preseal_entries = preseal.get("payloadFiles")
+          if not isinstance(preseal_entries, list):
+              raise SystemExit("preseal payload entries missing")
+          preseal_paths = [entry.get("path") for entry in preseal_entries if isinstance(entry, dict)]
+          if preseal_paths != sorted(payload) or len(preseal_paths) != len(set(preseal_paths)):
+              raise SystemExit("preseal payload paths mismatch")
+          expected_binding_digest = hashlib.sha256(
+              json.dumps(binding, sort_keys=True, separators=(",", ":")).encode("utf-8")
+          ).hexdigest()
+          if preseal.get("finalizerValidatedFilesSha256") != expected_binding_digest:
+              raise SystemExit("preseal-to-finalizer binding mismatch")
+          preseal_lines = []
+          for entry in preseal_entries:
+              path = root / entry["path"]
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              if digest != entry.get("sha256") or path.stat().st_size != entry.get("bytes"):
+                  raise SystemExit(f"preseal payload mismatch: {entry['path']}")
+              preseal_lines.append(f"{digest}  {entry['bytes']}  {entry['path']}\n")
+          if (root / "preseal.files").read_text(encoding="utf-8") != "".join(preseal_lines):
+              raise SystemExit("preseal.files mismatch")
+          expected_preseal_container = (
+              f"{hashlib.sha256((root / 'preseal.files').read_bytes()).hexdigest()}  preseal.files\n"
+              f"{hashlib.sha256((root / 'preseal.json').read_bytes()).hexdigest()}  preseal.json\n"
+          )
+          if (root / "preseal.sha256").read_text(encoding="utf-8") != expected_preseal_container:
+              raise SystemExit("preseal container digest mismatch")
+
+          expected_harness = {
+              "head": os.environ["GITHUB_SHA"], "parent": os.environ["EXPECTED_H_PARENT"],
+              "message": os.environ["EXPECTED_H_MESSAGE"],
+              "numstat": f"{os.environ['EXPECTED_H_ADDITIONS']}\t0\t{os.environ['WORKFLOW_PATH']}",
+              "workflowPath": os.environ["WORKFLOW_PATH"],
+          }
+          expected_candidate = {
+              "head": os.environ["P3_SHA"], "tree": os.environ["P3_TREE"], "parent": os.environ["P2_SHA"],
+              "diffFullIndexSha256": os.environ["P2_P3_FULL_INDEX_SHA256"],
+              "numstat": f"12\t7\t{os.environ['TARGET_FILE']}",
+          }
+          if manifest.get("steps", {}).get("guardHarness") == "success" and manifest.get("harness") != expected_harness:
+              raise SystemExit("independent harness manifest mismatch")
+          if manifest.get("steps", {}).get("guardCandidate") == "success" and manifest.get("candidate") != expected_candidate:
+              raise SystemExit("independent candidate manifest mismatch")
+          seal = json.loads((root / "seal.json").read_text(encoding="utf-8"))
+          if seal.get("schema") != "r7-p3-focus-g4-seal-v1" or seal.get("selfReferenceFree") is not True:
+              raise SystemExit("invalid seal contract")
+          actual = set()
+          for path in root.rglob("*"):
+              relative = path.relative_to(root).as_posix()
+              if path.is_symlink() or not path.is_file():
+                  raise SystemExit(f"symlink or nonregular entry in upload set: {relative}")
+              actual.add(relative)
+          if sorted(actual) != expected_artifacts or seal.get("artifactFiles") != expected_artifacts:
+              raise SystemExit("artifact set differs from exact sealed set")
+          sealed_paths = [entry.get("path") for entry in seal.get("sealedFiles", [])]
+          if sealed_paths != sorted(expected_precontainer) or len(sealed_paths) != len(set(sealed_paths)):
+              raise SystemExit("sealedFiles differs from reconstructed canonical pre-container set")
+          expected_lines = []
+          for entry in seal["sealedFiles"]:
+              path = root / entry["path"]
+              if not path.is_file() or path.is_symlink():
+                  raise SystemExit(f"sealed path missing or non-regular: {entry['path']}")
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              if digest != entry["sha256"] or path.stat().st_size != entry["bytes"]:
+                  raise SystemExit(f"sealed file mismatch: {entry['path']}")
+              expected_lines.append(f"{digest}  {entry['path']}\n")
+          if (root / "seal.files").read_text(encoding="utf-8") != "".join(expected_lines):
+              raise SystemExit("seal.files differs from recomputed set")
+          if hashlib.sha256((root / "seal.files").read_bytes()).hexdigest() != seal["sealFilesSha256"]:
+              raise SystemExit("seal.files digest mismatch")
+          expected_container = (
+              f"{hashlib.sha256((root / 'seal.files').read_bytes()).hexdigest()}  seal.files\n"
+              f"{hashlib.sha256((root / 'seal.json').read_bytes()).hexdigest()}  seal.json\n"
+          )
+          if (root / "seal.sha256").read_text(encoding="utf-8") != expected_container:
+              raise SystemExit("seal container digest mismatch")
+          manifest = json.loads((root / "manifest.json").read_text(encoding="utf-8"))
+          receipt = manifest.get("immutableRiskHistory", {}).get("notRunReceipt", {})
+          if manifest.get("selfReferenceFree") is not True or manifest.get("heavyClaim") is not False:
+              raise SystemExit("manifest self-reference/heavy claim mismatch")
+          if receipt.get("passInput") is not False or receipt.get("disposition") != "NOT_RUN":
+              raise SystemExit("NOT_RUN receipt was promoted into pass input")
+          classification = manifest.get("result", {}).get("classification")
+          finalstatus = json.loads((root / "finalstatus.json").read_text(encoding="utf-8"))
+          expected_status = "PASS" if classification == "PASS" else "FAIL"
+          if (
+              finalstatus.get("classification") != classification
+              or finalstatus.get("status") != expected_status
+              or finalstatus.get("heavyClaim") is not False
+              or finalstatus.get("buildClaim") is not False
+          ):
+              raise SystemExit("final status differs from sealed disposition")
+          utc_re = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z\n$")
+          times = {}
+          for name in ("job.started", "final.started", "final.ended"):
+              text = (root / name).read_text(encoding="ascii")
+              if len(text) != 21 or not utc_re.fullmatch(text):
+                  raise SystemExit(f"invalid final UTC marker: {name}")
+              times[name] = datetime.datetime.strptime(text.strip(), "%Y-%m-%dT%H:%M:%SZ")
+          if times["final.started"] < times["job.started"] or times["final.ended"] < times["final.started"]:
+              raise SystemExit("final UTC ordering mismatch")
+          expected_final_exit = "0\n" if classification == "PASS" else "1\n"
+          if (root / "final.exit").read_text(encoding="ascii") != expected_final_exit:
+              raise SystemExit("final exit differs from sealed disposition")
+          PY
+
+      - name: Upload complete exact G3 evidence envelope
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: r7-p3-focus-g4-P3-${{ github.run_id }}-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/r7-p3-focus-g4-evidence
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
