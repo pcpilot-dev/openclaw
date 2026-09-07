@@ -63,6 +63,22 @@ type ExistingAgentSchemaMeta = {
   schemaVersion: number | null;
 };
 
+/** The retired session_nodes entry-validity write-triggers, kept as an optional canonical group. */
+const SESSION_NODE_ENTRY_VALID_TRIGGER_DEFINITIONS = [
+  {
+    name: "session_nodes_entry_valid_after_insert",
+    sql: "CREATE TRIGGER IF NOT EXISTS main.session_nodes_entry_valid_after_insert\nAFTER INSERT ON session_nodes\nBEGIN\n  UPDATE session_nodes SET entry_valid = 0 WHERE session_key = NEW.session_key;\nEND;",
+  },
+  {
+    name: "session_nodes_entry_valid_after_entry_update",
+    sql: "CREATE TRIGGER IF NOT EXISTS main.session_nodes_entry_valid_after_entry_update\nAFTER UPDATE OF entry_json ON session_nodes\nBEGIN\n  UPDATE session_nodes SET entry_valid = 0 WHERE session_key = NEW.session_key;\nEND;",
+  },
+  {
+    name: "session_nodes_entry_valid_after_identity_update",
+    sql: "CREATE TRIGGER IF NOT EXISTS main.session_nodes_entry_valid_after_identity_update\nAFTER UPDATE OF current_session_id, updated_at ON session_nodes\nBEGIN\n  UPDATE session_nodes SET entry_valid = 0 WHERE session_key = NEW.session_key;\nEND;",
+  },
+];
+
 export function migratedSessionColumn(
   columns: ReadonlySet<string>,
   columnName: string,
@@ -106,6 +122,12 @@ const AGENT_SCHEMA_COMPATIBILITY = {
     {
       tableName: MEMORY_INDEX_SOURCES_TABLE,
       triggers: MEMORY_PATH_FTS_TRIGGER_DEFINITIONS,
+    },
+    {
+      // Old databases may still carry these while this revision retires them.
+      // Accept only their exact definitions until the migration drops them.
+      tableName: "session_nodes",
+      triggers: SESSION_NODE_ENTRY_VALID_TRIGGER_DEFINITIONS,
     },
   ],
 } satisfies SqliteSchemaCompatibility;

@@ -3736,9 +3736,9 @@ describe("openclaw agent database", () => {
       );
     try {
       shippedSchema.exec(`
-        DROP TRIGGER session_nodes_entry_valid_after_insert;
-        DROP TRIGGER session_nodes_entry_valid_after_entry_update;
-        DROP TRIGGER session_nodes_entry_valid_after_identity_update;
+        DROP TRIGGER IF EXISTS session_nodes_entry_valid_after_insert;
+        DROP TRIGGER IF EXISTS session_nodes_entry_valid_after_entry_update;
+        DROP TRIGGER IF EXISTS session_nodes_entry_valid_after_identity_update;
         DROP TRIGGER session_conversations_route_context_invalidate_after_update;
         DROP INDEX idx_agent_session_nodes_entry_valid_pending;
         DROP TABLE session_key_contract;
@@ -3775,6 +3775,71 @@ describe("openclaw agent database", () => {
     ).toEqual({ name: "route_context_json" });
   });
 
+  it("retires legacy entry-validity triggers and settles a pending row on cold open", () => {
+    const stateDir = createTempStateDir();
+    const env = { OPENCLAW_STATE_DIR: stateDir };
+    const databasePath = materializeCurrentWorkerAgentDatabase(stateDir);
+
+    const { DatabaseSync } = requireNodeSqlite();
+    const legacy = new DatabaseSync(databasePath);
+    try {
+      legacy.exec(`
+        DROP TRIGGER IF EXISTS session_nodes_entry_valid_after_insert;
+        DROP TRIGGER IF EXISTS session_nodes_entry_valid_after_entry_update;
+        DROP TRIGGER IF EXISTS session_nodes_entry_valid_after_identity_update;
+        CREATE TRIGGER session_nodes_entry_valid_after_insert
+        AFTER INSERT ON session_nodes
+        BEGIN
+          UPDATE session_nodes SET entry_valid = 0 WHERE session_key = NEW.session_key;
+        END;
+        CREATE TRIGGER session_nodes_entry_valid_after_entry_update
+        AFTER UPDATE OF entry_json ON session_nodes
+        BEGIN
+          UPDATE session_nodes SET entry_valid = 0 WHERE session_key = NEW.session_key;
+        END;
+        CREATE TRIGGER session_nodes_entry_valid_after_identity_update
+        AFTER UPDATE OF current_session_id, updated_at ON session_nodes
+        BEGIN
+          UPDATE session_nodes SET entry_valid = 0 WHERE session_key = NEW.session_key;
+        END;
+      `);
+      legacy
+        .prepare(
+          `INSERT INTO session_nodes (session_key, current_session_id, entry_json, updated_at)
+           VALUES (?, ?, ?, ?)`,
+        )
+        .run(
+          "agent:worker-1:pending",
+          "pending-session",
+          JSON.stringify({ sessionId: "pending-session", updatedAt: 1 }),
+          1,
+        );
+      expect(
+        legacy
+          .prepare("SELECT entry_valid FROM session_nodes WHERE session_key = ?")
+          .get("agent:worker-1:pending"),
+      ).toEqual({ entry_valid: 0 });
+    } finally {
+      legacy.close();
+    }
+
+    const reopened = openOpenClawAgentDatabase({ agentId: "worker-1", env });
+    expect(
+      reopened.db
+        .prepare(
+          `SELECT name FROM sqlite_schema
+           WHERE type = 'trigger' AND name LIKE 'session_nodes_entry_valid_after_%'
+           ORDER BY name`,
+        )
+        .all(),
+    ).toEqual([]);
+    expect(
+      reopened.db
+        .prepare("SELECT entry_valid FROM session_nodes WHERE session_key = ?")
+        .get("agent:worker-1:pending"),
+    ).toEqual({ entry_valid: 1 });
+  });
+
   it("installs same-version session additions before maintenance index repair", () => {
     const stateDir = createTempStateDir();
     const databasePath = materializeCurrentWorkerAgentDatabase(stateDir);
@@ -3794,9 +3859,9 @@ describe("openclaw agent database", () => {
           1000,
         );
       drifted.exec(`
-        DROP TRIGGER session_nodes_entry_valid_after_insert;
-        DROP TRIGGER session_nodes_entry_valid_after_entry_update;
-        DROP TRIGGER session_nodes_entry_valid_after_identity_update;
+        DROP TRIGGER IF EXISTS session_nodes_entry_valid_after_insert;
+        DROP TRIGGER IF EXISTS session_nodes_entry_valid_after_entry_update;
+        DROP TRIGGER IF EXISTS session_nodes_entry_valid_after_identity_update;
         DROP INDEX idx_agent_session_nodes_entry_valid_pending;
         DROP TABLE session_key_contract;
         ALTER TABLE session_nodes DROP COLUMN entry_valid;
