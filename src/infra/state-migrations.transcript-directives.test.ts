@@ -525,9 +525,9 @@ describe("historical transcript directive migration", () => {
     const opened = openOpenClawAgentDatabase({ agentId: "main", env });
     const databasePath = opened.path;
     opened.db.exec(`
-      DROP TRIGGER session_nodes_entry_valid_after_insert;
-      DROP TRIGGER session_nodes_entry_valid_after_entry_update;
-      DROP TRIGGER session_nodes_entry_valid_after_identity_update;
+      DROP TRIGGER IF EXISTS session_nodes_entry_valid_after_insert;
+      DROP TRIGGER IF EXISTS session_nodes_entry_valid_after_entry_update;
+      DROP TRIGGER IF EXISTS session_nodes_entry_valid_after_identity_update;
       DROP INDEX idx_agent_session_nodes_entry_valid_pending;
       ALTER TABLE session_nodes DROP COLUMN entry_valid;
     `);
