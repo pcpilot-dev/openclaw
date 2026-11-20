@@ -9,7 +9,11 @@ import {
 import { resolveMemoryRemDreamingConfig } from "openclaw/plugin-sdk/memory-core-host-status";
 import { resolvePreferredOpenClawTmpDir } from "openclaw/plugin-sdk/temp-path";
 import { terminalText } from "openclaw/plugin-sdk/terminal-safe-text";
-import { resolveMemoryPluginConfig, withMemoryCommand } from "./cli-runtime-common.js";
+import {
+  type MemoryCommandExecution,
+  resolveMemoryPluginConfig,
+  withMemoryCommand,
+} from "./cli-runtime-common.js";
 import type { MemoryRemBackfillOptions, MemoryRemHarnessOptions } from "./cli.types.js";
 import { removeBackfillDiaryEntries, writeBackfillDiaryEntries } from "./dreaming-dreams-file.js";
 import { DAILY_MEMORY_FILENAME_RE } from "./dreaming-ingestion-state.js";
@@ -118,9 +122,12 @@ export function printSessionBackfillResult(
 export async function runMemoryRemHarness(
   opts: MemoryRemHarnessOptions,
   hostOptions?: MemoryCoreRuntimeHost,
+  execution?: MemoryCommandExecution,
 ) {
+  const output = execution?.output ?? defaultRuntime;
   await withMemoryCommand({
     commandName: "memory rem-harness",
+    execution,
     options: opts,
     purpose: "status",
     ...hostOptions,
@@ -171,7 +178,7 @@ export async function runMemoryRemHarness(
       const groundedPreview = preview.grounded;
       const deepCandidates = preview.deep.candidates;
       if (opts.json) {
-        defaultRuntime.writeJson({
+        output.writeJson({
           workspaceDir,
           sourcePath: opts.path ? path.resolve(opts.path) : null,
           sourceFiles,
@@ -256,7 +263,7 @@ export async function runMemoryRemHarness(
               )
           : ["- No deep candidates."]),
       ];
-      defaultRuntime.log(lines.join("\n"));
+      output.log(lines.join("\n"));
     },
   });
 }

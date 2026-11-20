@@ -23,13 +23,13 @@ afterEach(() => vi.clearAllMocks());
 describe("memory CLI owner admission", () => {
   it.each([
     [["status"], "memory.cli", true],
-    [["index"], "memory.cli", true],
+    [["index"], "memory.index.owner", false],
     [["search", "query"], "memory.search.owner", false],
     [["forget", "--session", "fixture"], "memory.cli", true],
     [["reset", "--yes"], "memory.cli", true],
-    [["promote", "--apply"], "memory.cli", true],
+    [["promote", "--apply"], "memory.promote.owner", true],
     [["promote-explain", "fixture"], "memory.cli", true],
-    [["rem-harness"], "memory.cli", true],
+    [["rem-harness"], "memory.remHarness.owner", false],
     [["rem-backfill", "--stage-short-term"], "memory.cli", true],
     [["session-backfill"], "memory.sessionBackfill.preview.owner", false],
     [["session-backfill", "--apply"], "memory.sessionBackfill.apply.owner", false],
