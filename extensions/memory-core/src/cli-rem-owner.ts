@@ -26,6 +26,7 @@ export async function runMemoryRemWithOwner(
       if (operation === "promote") await runtime.runMemoryPromote(opts, hostOptions);
       else if (operation === "remHarness") await runtime.runMemoryRemHarness(opts, hostOptions);
       else await runtime.runMemoryIndex(opts, hostOptions);
+      return undefined;
     },
   });
   for (const item of reply?.output ?? []) {
