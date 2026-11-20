@@ -34,6 +34,7 @@ import {
 import type { MemoryCoreAcquireLocalService } from "./src/memory/embedding-local-service.js";
 import { prepareMemoryManagerReload, retainMemoryIndexingAgents } from "./src/memory/lifecycle.js";
 import type { MemoryCoreRuntimeHost } from "./src/memory/runtime-host.js";
+import { registerMemoryRemGatewayMethods } from "./src/rem-gateway.js";
 import { registerSessionBackfillGatewayMethods } from "./src/session-backfill-gateway.js";
 
 type MemoryToolsModule = typeof import("./src/tools.js");
@@ -312,6 +313,7 @@ export default definePluginEntry({
       },
     });
     registerSessionBackfillGatewayMethods(api);
+    registerMemoryRemGatewayMethods(api, host);
     api.registerMemoryCapability({
       recallToolNames: ["memory_search", "memory_get"],
       deterministicRecallToolName: "memory_search",

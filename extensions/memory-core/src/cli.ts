@@ -82,10 +82,27 @@ export function registerMemoryCli(program: Command, hostOptions?: MemoryCoreRunt
         | "runMemoryRemBackfill",
     ) =>
     async (opts: MemoryCommandOptions) => {
-      await runMemoryCliCommand(async () => {
-        const runtime = await import("./cli.runtime.js");
-        await runtime[name](opts, hostOptions);
-      });
+      if (
+        name === "runMemoryIndex" ||
+        name === "runMemoryPromote" ||
+        name === "runMemoryRemHarness"
+      ) {
+        const { runMemoryRemWithOwner } = await import("./cli-rem-owner.js");
+        await runMemoryRemWithOwner(
+          name === "runMemoryIndex"
+            ? "index"
+            : name === "runMemoryPromote"
+              ? "promote"
+              : "remHarness",
+          opts,
+          hostOptions,
+        );
+      } else {
+        await runMemoryCliCommand(async () => {
+          const runtime = await import("./cli.runtime.js");
+          await runtime[name](opts, hostOptions);
+        });
+      }
     };
   const memory = program
     .command("memory")

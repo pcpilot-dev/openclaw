@@ -151,8 +151,15 @@ export function formatExtraPaths(workspaceDir: string, extraPaths: MemoryExtraPa
     return details.length > 0 ? `${root} (${details.join(", ")})` : root;
   });
 }
+export type MemoryCommandExecution = {
+  config: OpenClawConfig;
+  assertCurrent: () => void;
+  output: Pick<typeof defaultRuntime, "log" | "error" | "writeJson">;
+};
+
 export async function withMemoryCommand(params: {
   commandName: string;
+  execution?: MemoryCommandExecution;
   options: Pick<MemoryCommandOptions, "agent" | "json">;
   allAgents?: boolean;
   purpose?: MemoryManagerPurpose;
@@ -163,20 +170,24 @@ export async function withMemoryCommand(params: {
   requiresMemorySlot?: boolean;
   run: (context: { manager: MemoryManager; cfg: OpenClawConfig; agentId: string }) => Promise<void>;
 }): Promise<OpenClawConfig> {
+  const output = params.execution?.output ?? defaultRuntime;
+  params.execution?.assertCurrent();
   const { agent, json } = params.options;
   // Status owns one aggregate document; single-agent commands report acquisition failures here.
-  const onUnavailable = json && !params.allAgents ? defaultRuntime.writeJson : undefined;
-  const { config: cfg, diagnostics } = await loadMemoryCommandConfig(
-    params.commandName,
-    params.purpose === "status" ? "read_only_status" : undefined,
-  );
+  const onUnavailable = json && !params.allAgents ? output.writeJson : undefined;
+  const { config: cfg, diagnostics } = params.execution
+    ? { config: params.execution.config, diagnostics: [] }
+    : await loadMemoryCommandConfig(
+        params.commandName,
+        params.purpose === "status" ? "read_only_status" : undefined,
+      );
   for (const entry of diagnostics) {
     emitMemoryCommandWarning(`[secrets] ${entry}`, json === true);
   }
   const slotOwner = resolveForeignMemorySlotOwner(cfg);
   if (slotOwner && params.requiresMemorySlot) {
     const message = `${params.commandName} reads only Memory Core's sidecar index, but plugins.slots.memory selects "${slotOwner}". Search the selected memory through the agent's memory tools or the ${slotOwner} plugin's own commands.`;
-    defaultRuntime.error(terminalText`${message}`);
+    output.error(terminalText`${message}`);
     process.exitCode = 1;
     onUnavailable?.({
       ...formatCliJsonFailure(message),
@@ -185,39 +196,51 @@ export async function withMemoryCommand(params: {
     return cfg;
   }
   if (slotOwner) {
-    emitMemoryCoreSidecarNotice(slotOwner, { json });
+    if (params.execution) output.error(formatMemoryCoreSidecarNotice(slotOwner));
+    else emitMemoryCoreSidecarNotice(slotOwner, { json });
   }
   const agentIds = params.allAgents
     ? resolveMemoryAgentIds(cfg, agent)
     : [resolveMemoryAgent(cfg, agent)];
   for (const agentId of agentIds) {
     await withManager<MemoryManager>({
-      getManager: () =>
-        getMemorySearchManager({
+      getManager: () => {
+        params.execution?.assertCurrent();
+        return getMemorySearchManager({
           cfg,
           agentId,
           purpose: params.purpose,
           inspectSources: params.inspectSources,
           acquireLocalService: params.acquireLocalService,
           runInBackgroundContext: params.runInBackgroundContext,
-        }),
+        });
+      },
       onMissing: (error) => {
+        if (params.execution) {
+          throw new Error(error || "Memory search disabled.");
+        }
         if (!error?.trim()) {
-          defaultRuntime.log("Memory search disabled.");
+          output.log("Memory search disabled.");
           onUnavailable?.({ agentId, status: "disabled" });
           return;
         }
         const message = `${params.commandName} failed (${agentId}): ${error}`;
-        defaultRuntime.error(terminalText`${message}`);
+        output.error(terminalText`${message}`);
         process.exitCode = 1;
         onUnavailable?.({ ...formatCliJsonFailure(message), agentId });
       },
-      onCloseError: (err) =>
-        defaultRuntime.error(terminalText`Memory manager close failed: ${formatErrorMessage(err)}`),
+      onCloseError: (err) => {
+        if (params.execution) throw err;
+        output.error(terminalText`Memory manager close failed: ${formatErrorMessage(err)}`);
+      },
       close: async (manager) => {
         await manager.close?.();
       },
-      run: async (manager) => params.run({ manager, cfg, agentId }),
+      run: async (manager) => {
+        params.execution?.assertCurrent();
+        await params.run({ manager, cfg, agentId });
+        params.execution?.assertCurrent();
+      },
     });
   }
   return cfg;

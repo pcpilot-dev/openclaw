@@ -17,6 +17,7 @@ import { captureRuntimeConfigAsyncReader } from "openclaw/plugin-sdk/runtime-con
 import { terminalText } from "openclaw/plugin-sdk/terminal-safe-text";
 import { resolveForeignMemorySlotOwner } from "./cli-memory-slot.js";
 import {
+  type MemoryCommandExecution,
   emitMemoryCoreSidecarNotice,
   formatAuditCounts,
   formatExtraPaths,
@@ -62,10 +63,13 @@ function formatSourceLabel(source: string, workspaceDir: string): string {
 export async function runMemoryIndex(
   opts: MemoryCommandOptions,
   hostOptions?: MemoryCoreRuntimeHost,
+  execution?: MemoryCommandExecution,
 ) {
-  setVerbose(Boolean(opts.verbose));
+  const output = execution?.output ?? defaultRuntime;
+  if (!execution) setVerbose(Boolean(opts.verbose));
   await withMemoryCommand({
     commandName: "memory index",
+    execution,
     options: { agent: opts.agent },
     allAgents: true,
     purpose: "cli",
@@ -101,14 +105,21 @@ export async function runMemoryIndex(
           if (status.fallback) {
             lines.push(`${label("Fallback")} ${warn(terminalText`${status.fallback.from}`)}`);
           }
-          defaultRuntime.log(lines.join("\n"));
-          defaultRuntime.log("");
+          output.log(lines.join("\n"));
+          output.log("");
         }
         if (!syncFn) {
-          defaultRuntime.log("Memory backend does not support manual reindex.");
+          if (execution) throw new Error("Memory backend does not support manual reindex.");
+          output.log("Memory backend does not support manual reindex.");
           return;
         }
-        await syncMemoryWithProgress({ sync: syncFn, options: opts, elapsed: true });
+        execution?.assertCurrent();
+        if (execution) {
+          await syncFn({ reason: "cli", force: Boolean(opts.force) });
+        } else {
+          await syncMemoryWithProgress({ sync: syncFn, options: opts, elapsed: true });
+        }
+        execution?.assertCurrent();
         let postIndexStatus = await readMemorySearchManagerStatus(manager);
         const scan = await scanMemoryManagerSources(postIndexStatus);
         const outcome = formatMemoryIndexOutcome(postIndexStatus, scan, agentId);
@@ -134,17 +145,18 @@ export async function runMemoryIndex(
           postIndexStatus.vector?.available ??
           postIndexStatus.vector?.storeAvailable;
         const vectorLoadErr = postIndexStatus.vector?.loadError;
-        defaultRuntime.log(terminalText`${outcome}`);
+        output.log(terminalText`${outcome}`);
         if (vectorEnabled && vectorAvailable === false) {
           // Indexing still persisted chunks/FTS state; keep the command successful but
           // emit a stderr warning so operators and scripts can detect degraded recall.
-          defaultRuntime.error(
+          output.error(
             terminalText`Memory index WARNING (${agentId}): chunks_vec not updated — ${formatMemoryVectorDegradedWriteReason(vectorLoadErr)}. Vector recall degraded.`,
           );
         }
       } catch (err) {
+        if (execution) throw err;
         const message = formatErrorMessage(err);
-        defaultRuntime.error(terminalText`Memory index failed (${agentId}): ${message}`);
+        output.error(terminalText`Memory index failed (${agentId}): ${message}`);
         process.exitCode = 1;
       }
     },
@@ -273,11 +285,14 @@ async function runMemoryPromotion(
   opts: MemoryPromoteCommandOptions,
   hostOptions: MemoryCoreRuntimeHost | undefined,
   selector?: string,
+  execution?: MemoryCommandExecution,
 ) {
+  const output = execution?.output ?? defaultRuntime;
   const explain = selector !== undefined;
   const command = explain ? "promote-explain" : "promote";
   await withMemoryCommand({
     commandName: `memory ${command}`,
+    execution,
     options: opts,
     purpose: "status",
     ...hostOptions,
@@ -325,7 +340,7 @@ async function runMemoryPromotion(
           maxAgeDays: dreaming.maxAgeDays ?? null,
         };
         if (opts.json) {
-          defaultRuntime.writeJson({
+          output.writeJson({
             workspaceDir,
             thresholds,
             candidate,
@@ -360,7 +375,7 @@ async function runMemoryPromotion(
         if (candidate.conceptTags.length > 0) {
           lines.push(muted(terminalText`concepts=${candidate.conceptTags.join(", ")}`));
         }
-        defaultRuntime.log(lines.join("\n"));
+        output.log(lines.join("\n"));
         return;
       }
       let applyResult: Awaited<ReturnType<typeof applyShortTermPromotions>> | undefined;
@@ -413,7 +428,7 @@ async function runMemoryPromotion(
       const lockPath = resolveShortTermRecallLockPath(workspaceDir);
       const audit = await auditShortTermPromotionArtifacts({ workspaceDir });
       if (opts.json) {
-        defaultRuntime.writeJson({
+        output.writeJson({
           workspaceDir,
           storePath,
           lockPath,
@@ -433,11 +448,11 @@ async function runMemoryPromotion(
         return;
       }
       if (candidates.length === 0) {
-        defaultRuntime.log("No short-term recall candidates.");
-        defaultRuntime.log(terminalText`Recall store: ${shortenHomePath(storePath)}`);
+        output.log("No short-term recall candidates.");
+        output.log(terminalText`Recall store: ${shortenHomePath(storePath)}`);
         if (audit.issues.length > 0) {
           for (const issue of audit.issues) {
-            defaultRuntime.log(terminalText`${issue.message}`);
+            output.log(terminalText`${issue.message}`);
           }
         }
         return;
@@ -493,15 +508,16 @@ async function runMemoryPromotion(
           lines.push(warn("No candidates met apply criteria."));
         }
       }
-      defaultRuntime.log(lines.join("\n").trim());
+      output.log(lines.join("\n").trim());
     },
   });
 }
 export async function runMemoryPromote(
   opts: MemoryPromoteCommandOptions,
   hostOptions?: MemoryCoreRuntimeHost,
+  execution?: MemoryCommandExecution,
 ) {
-  await runMemoryPromotion(opts, hostOptions);
+  await runMemoryPromotion(opts, hostOptions, undefined, execution);
 }
 
 export async function runMemoryPromoteExplain(
