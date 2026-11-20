@@ -85,10 +85,12 @@ export function registerMemoryRemGatewayMethods(
           return;
         }
         try {
+          let assertOwnerCurrent: (() => void) | undefined;
           const result = await runWithLocalStateMutationOwner(
             request.expectedOwnerId,
             invocation,
             async (assertCurrent) => {
+              assertOwnerCurrent = assertCurrent;
               const output: MemoryOwnerOutput[] = [];
               const execution = {
                 config: api.runtime.config.current() as OpenClawConfig,
@@ -119,6 +121,7 @@ export function registerMemoryRemGatewayMethods(
               return { output };
             },
           );
+          assertOwnerCurrent?.();
           respond(true, result);
         } catch (error) {
           respond(false, undefined, errorShape(ErrorCodes.UNAVAILABLE, String(error)));

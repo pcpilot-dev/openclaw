@@ -5,6 +5,7 @@ import { registerMemoryRemGatewayMethods } from "./rem-gateway.js";
 
 const fixture = vi.hoisted(() => ({
   current: true,
+  retireAfterRun: false,
   run: vi.fn(),
 }));
 vi.mock("./cli.runtime.js", () => ({
@@ -25,7 +26,9 @@ vi.mock("openclaw/plugin-sdk/gateway-runtime", async (original) => ({
       if (owner !== "current-owner" || !fixture.current) throw new Error("owner retired");
     };
     assertCurrent();
-    return run(assertCurrent);
+    const result = await run(assertCurrent);
+    if (fixture.retireAfterRun) fixture.current = false;
+    return result;
   },
 }));
 
@@ -57,6 +60,7 @@ function harness() {
 
 beforeEach(() => {
   fixture.current = true;
+  fixture.retireAfterRun = false;
   fixture.run.mockReset();
 });
 
@@ -120,4 +124,13 @@ it("reports domain/index failure instead of success", async () => {
   const respond = await harness()("index", { expectedOwnerId: "current-owner", agent: "pixi" });
   expect(respond.mock.calls[0]?.[0]).toBe(false);
   expect(respond.mock.calls[0]?.[2]).toMatchObject({ code: "UNAVAILABLE" });
+});
+
+// The request can retire as the owner callback settles, before transport disclosure.
+it("revalidates the retained owner immediately before replying", async () => {
+  fixture.retireAfterRun = true;
+  fixture.run.mockResolvedValueOnce(undefined);
+  const respond = await harness()("promote", { expectedOwnerId: "current-owner", agent: "pixi" });
+  expect(respond.mock.calls[0]?.[0]).toBe(false);
+  expect(respond.mock.calls[0]?.[1]).toBeUndefined();
 });
