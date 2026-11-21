@@ -9,11 +9,13 @@ import {
   uniqueStrings,
 } from "@openclaw/normalization-core/string-normalization";
 import { getLoadedChannelPlugin } from "../channels/plugins/index.js";
+import { getLoadedChannelPluginEntryById } from "../channels/plugins/registry-loaded.js";
 import { resolveSessionConversation } from "../channels/plugins/session-conversation.js";
 import { resolveChannelGroupToolsPolicy } from "../config/group-policy.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import type { AgentToolsConfig } from "../config/types.tools.js";
 import { logWarn } from "../logger.js";
+import { getPluginRuntimeGatewayRequestScope } from "../plugins/runtime/gateway-request-scope.js";
 import { DEFAULT_ACCOUNT_ID, normalizeAccountId } from "../routing/account-id.js";
 import { normalizeAgentId, parseAgentSessionKey } from "../routing/session-key.js";
 import {
@@ -542,9 +544,14 @@ export function resolveGroupToolPolicy(params: {
       ? throwUnavailableScheduledAccount(accountId)
       : undefined;
   }
+  // Expired request authority must not become a broader config fallback.
+  const registry = getPluginRuntimeGatewayRequestScope()?.pluginRegistry;
   let plugin;
   try {
-    plugin = getLoadedChannelPlugin(channel);
+    // An explicit request registry must not borrow another account's root plugin.
+    plugin = registry
+      ? getLoadedChannelPluginEntryById(channel, registry)?.plugin
+      : getLoadedChannelPlugin(channel);
   } catch {
     // Plugin lookup failure leaves the canonical config policy fallback in charge.
     plugin = undefined;

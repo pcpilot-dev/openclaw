@@ -14,6 +14,10 @@ import { withOperatorToolGatewayAuthority } from "../../gateway/server-plugin-in
 import { createDeferredCore } from "../../shared/deferred.js";
 import { closeOpenClawAgentDatabasesAsync } from "../../state/openclaw-agent-db-lifecycle.js";
 import {
+  createChannelTestPluginBase,
+  createTestRegistry,
+} from "../../test-utils/channel-plugins.js";
+import {
   readCronRunHistoryPageForTests,
   readCronRunRecordsForTests,
 } from "../run-history.test-support.js";
@@ -29,6 +33,7 @@ import {
   loadRunCronIsolatedAgentTurn,
   makeCronSession,
   mockRunCronFallbackPassthrough,
+  preparedRunPluginRegistryMock,
   resetRunCronIsolatedAgentTurnHarness,
   resolveCronSessionMock,
   runEmbeddedAgentMock,
@@ -58,7 +63,7 @@ type AccountCase = [
   accountId: string | undefined,
   toolsAllow: string[] | undefined,
   fails: boolean,
-  options?: { manual?: boolean; channel?: string },
+  options?: { manual?: boolean; channel?: string; scopedAccountId?: string },
 ];
 it.each<AccountCase>([
   ["removed named account", "removed", ["read"], true],
@@ -74,6 +79,8 @@ it.each<AccountCase>([
   ["intentional no-tool job", "work", [], false],
   ["configured DM account without delivery", "work", ["read"], false, { channel: "whatsapp" }],
   ["DM account with malformed creator origin", "work", ["read"], true, { channel: "" }],
+  ["request-local scheduled account", "private", ["read"], false, { scopedAccountId: "private" }],
+  ["root account absent from request", "work", ["read"], true, { scopedAccountId: "private" }],
 ])(
   "records %s through scheduler and history",
   async (name, accountId, toolsAllow, fails, options = {}) => {
@@ -85,6 +92,27 @@ it.each<AccountCase>([
       session: { store: sessionStorePath },
       channels: { whatsapp: { accounts: { work: {} } } },
     };
+    const scopedAccountId = options.scopedAccountId;
+    // Execution selects the prepared generation's registry, not the ambient caller's registry.
+    preparedRunPluginRegistryMock.mockReturnValue(
+      createTestRegistry([
+        {
+          pluginId: "fixture-whatsapp",
+          source: "fixture",
+          plugin: createChannelTestPluginBase({
+            id: "whatsapp",
+            config: {
+              listAccountIds: scopedAccountId
+                ? () => [scopedAccountId]
+                : (config) => [
+                    "default",
+                    ...Object.keys(config.channels?.whatsapp?.accounts ?? {}),
+                  ],
+            },
+          }),
+        },
+      ]),
+    );
     setRuntimeConfigSnapshot(cfg);
     resolveCronSessionMock.mockReturnValue(makeCronSession({ storePath: sessionStorePath }));
     const job: CronStoredJob = {
@@ -158,7 +186,7 @@ it.each<AccountCase>([
       const tasks = readCronRunRecordsForTests(job.id);
       const expectedStatus = fails ? "error" : "ok";
       const completionStatus = fails ? "failed" : "succeeded";
-      expect(persisted?.state.lastRunStatus).toBe(expectedStatus);
+      expect(persisted?.state.lastRunStatus, persisted?.state.lastError).toBe(expectedStatus);
       expect(history.entries).toMatchObject([{ status: expectedStatus, completionStatus }]);
       expect(tasks).toMatchObject([{ status: completionStatus }]);
       expect(events.filter((event) => event.action === "finished")).toEqual([

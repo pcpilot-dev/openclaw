@@ -55,6 +55,8 @@ describe("npm registry spec parsing helpers", () => {
 
   it.each([
     [" 2026.7.1-1 ", "2026.7.1"],
+    ["2026.11.6-1", "2026.11.6"],
+    ["2026.11.6-26112001", "2026.11.6"],
     ["2026.7.1-beta.3", "2026.7.1-beta.3"],
   ])("resolves the OpenClaw release cohort for %s", (version, expected) => {
     expect(resolveOpenClawReleaseCohortVersion(version)).toBe(expected);
